@@ -50,4 +50,23 @@ $(document).ready(function() {
       function (e) { console.log(e); }
     );
   });
+
+  $('#recvansbtn').click(function () {
+    var anstxt = $('#answertxt').val();
+    console.log(anstxt);
+    try {
+      desc = JSON.parse(anstxt);
+    } catch(e) {
+      console.log(e);
+      return;
+    }
+
+    pc.setRemoteDescription(
+      new RTCSessionDescription(desc),
+      function () {
+        console.log("Session Established.");
+      },
+      function (e) { console.log(e); }
+    );
+  });
 });
