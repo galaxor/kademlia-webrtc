@@ -30,6 +30,13 @@ $(document).ready(function() {
       return;
     }
     pc = new RTCPeerConnection(null);
+    pc.ondatachannel = function (event) {
+      dc = event.channel;
+      dc.onmessage = function (event) {
+        console.log("Data: ", event.data);
+      };
+    };
+
     pc.setRemoteDescription(
       new RTCSessionDescription(desc),
       function () {
@@ -61,10 +68,19 @@ $(document).ready(function() {
       return;
     }
 
+    dc.onmessage = function (event) {
+      console.log("Data: ", event.data);
+    };
+
+    dc.onopen = function (event) {
+      console.log("Data channel open");
+      dc.send("Hellooo");
+    };
+
     pc.setRemoteDescription(
       new RTCSessionDescription(desc),
       function () {
-        console.log("Session Established.");
+        console.log("Session established");
       },
       function (e) { console.log(e); }
     );
