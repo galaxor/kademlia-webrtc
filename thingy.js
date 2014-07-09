@@ -32,6 +32,9 @@ $(document).ready(function() {
     pc = new RTCPeerConnection(null);
     pc.ondatachannel = function (event) {
       dc = event.channel;
+
+      dc.onopen = dataChannelOpen;
+
       dc.onmessage = function (event) {
         console.log("Data: ", event.data);
       };
@@ -72,10 +75,7 @@ $(document).ready(function() {
       console.log("Data: ", event.data);
     };
 
-    dc.onopen = function (event) {
-      console.log("Data channel open");
-      dc.send("Hellooo");
-    };
+    dc.onopen = dataChannelOpen;
 
     pc.setRemoteDescription(
       new RTCSessionDescription(desc),
@@ -86,3 +86,22 @@ $(document).ready(function() {
     );
   });
 });
+
+function dataChannelOpen() {
+  var dc = this;
+  console.log("Data channel open");
+  $('#session_establishment').hide();
+
+  dc.onmessage = onMessage;
+
+  $('#sendmsg').click(function () {
+    var msg = $('#msgtxt').val();
+    console.log("Msg is ", msg);
+    $('#msgroll').prepend('<div class="you">'+msg+'</div>');
+    dc.send(msg);
+  });
+}
+
+function onMessage(event) {
+  $('#msgroll').prepend('<div class="them">'+event.data+'</div>');
+}
