@@ -2,6 +2,7 @@ function WebRTCPeer(namespace) {
   this.pc = null;
   this.dc = null;
   this.msgHandlers = [];
+  this.dataChannelOpenHandlers = [];
 
   if (typeof namespace == "undefined") {
     this.RTCPeerConnection = RTCPeerConnection;
@@ -17,7 +18,7 @@ WebRTCPeer.prototype.createOffer = function (callback) {
 
   this.pc = new this.RTCPeerConnection(null);
   this.dc = this.pc.createDataChannel('zapchan');
-  this.dc.onopen = function () { peer.dataChannelOpen() };
+  this.dc.onopen = function () { peer.dataChannelOpen(this) };
   var offertxt;
   this.pc.createOffer(
     function (offer) {
@@ -31,15 +32,11 @@ WebRTCPeer.prototype.createOffer = function (callback) {
     },
     function (e) { console.log(e); }
   );
-
-  return {
-    peerConnection: this.pc,
-    dataChannel: this.dc,
-  };
 };
 
 WebRTCPeer.prototype.createAnswer = function (offertxt, callback) {
   var desc;
+  var peer = this;
   try {
     desc = JSON.parse(offertxt);
   } catch(e) {
@@ -47,7 +44,7 @@ WebRTCPeer.prototype.createAnswer = function (offertxt, callback) {
     return;
   }
   this.pc = new this.RTCPeerConnection(null);
-  pc.ondatachannel = function (event) {
+  this.pc.ondatachannel = function (event) {
     peer.dc = event.channel;
 
     peer.dc.onopen = function () { peer.dataChannelOpen(this); };
@@ -72,7 +69,7 @@ WebRTCPeer.prototype.createAnswer = function (offertxt, callback) {
   );
 };
 
-WebRTCPeer.prototype.recvAnswer(anstxt) {
+WebRTCPeer.prototype.recvAnswer = function (anstxt) {
   console.log(anstxt);
   var desc;
   var peer = this;
@@ -83,7 +80,7 @@ WebRTCPeer.prototype.recvAnswer(anstxt) {
     return;
   }
 
-  // The dataChannel's onopen handler was already set by createOffer.
+  // The dataChannel's onopen handler was already set by createOffer or createAnswer.
 
   this.pc.setRemoteDescription(
     new this.RTCSessionDescription(desc),
@@ -94,9 +91,17 @@ WebRTCPeer.prototype.recvAnswer(anstxt) {
   );
 };
 
+WebRTCPeer.prototype.addDataChannelOpenHandler = function (handler) {
+  this.dataChannelOpenHandlers[this.dataChannelOpenHandlers.length] = handler;
+};
+
 WebRTCPeer.prototype.dataChannelOpen = function (dc) {
   var peer = this;
   dc.onmessage = function (event) { peer.onMessage(event); };
+
+  for (var i=0; i<this.dataChannelOpenHandlers.length; i++) {
+    this.dataChannelOpenHandlers[i](dc);
+  }
 };
 
 WebRTCPeer.prototype.addMsgHandler = function (handler) {
