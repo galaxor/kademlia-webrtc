@@ -84,9 +84,7 @@ WebRTCPeer.prototype.recvAnswer = function (anstxt) {
 
   this.pc.setRemoteDescription(
     new this.RTCSessionDescription(desc),
-    function () {
-      console.log("Session established");
-    },
+    function () {},
     function (e) { console.log(e); }
   );
 };
