@@ -19,7 +19,6 @@ WebRTCPeer.prototype.createOffer = function (callback) {
   this.pc = new this.RTCPeerConnection(null);
   this.dc = this.pc.createDataChannel('zapchan');
   this.dc.onopen = function () { peer.dataChannelOpen(this) };
-  var offertxt;
   this.pc.createOffer(
     function (offer) {
       peer.pc.setLocalDescription(
@@ -34,15 +33,9 @@ WebRTCPeer.prototype.createOffer = function (callback) {
   );
 };
 
-WebRTCPeer.prototype.createAnswer = function (offertxt, callback) {
-  var desc;
+WebRTCPeer.prototype.createAnswer = function (desc, callback) {
   var peer = this;
-  try {
-    desc = JSON.parse(offertxt);
-  } catch(e) {
-    console.log(e);
-    return;
-  }
+
   this.pc = new this.RTCPeerConnection(null);
   this.pc.ondatachannel = function (event) {
     peer.dc = event.channel;
@@ -69,16 +62,8 @@ WebRTCPeer.prototype.createAnswer = function (offertxt, callback) {
   );
 };
 
-WebRTCPeer.prototype.recvAnswer = function (anstxt) {
-  console.log(anstxt);
-  var desc;
+WebRTCPeer.prototype.recvAnswer = function (desc) {
   var peer = this;
-  try {
-    desc = JSON.parse(anstxt);
-  } catch(e) {
-    console.log(e);
-    return;
-  }
 
   // The dataChannel's onopen handler was already set by createOffer or createAnswer.
 

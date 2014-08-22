@@ -6,24 +6,29 @@ $(document).ready(function() {
     $('#msgroll').prepend('<div class="them">'+event.data+'</div>');
   });
 
-  $('button#offerbtn').click(function () {
+  // The websocket client for session establishment
+  var socket = io('http://localhost:5333');
+
+  socket.on('connect', function () {
+    // The newly-connecting client will create an offer and send it.  The
+    // meet-n-greet server will store the offers.  When it has two willing
+    // clients, it will send the most recent offer to the other.
     peer.createOffer(function (offer) {
-      $('#offertxt').append(JSON.stringify(offer));
+      console.log("Created offer",offer);
+      socket.emit('offer', offer);
     });
-  });
 
-  $('button#answerbtn').click(function () {
-    var offertxt = $('#offertxt').val();
-
-    peer.createAnswer(offertxt, function (answer) {
-      var anstxt = JSON.stringify(answer);
-      $('#answertxt').append(anstxt);
+    socket.on('recvanswer', function (answer) {
+      console.log("Received answer",answer);
+      peer.recvAnswer(answer);
     });
-  });
 
-  $('#recvansbtn').click(function () {
-    var anstxt = $('#answertxt').val();
-    peer.recvAnswer(anstxt);
+    socket.on('createanswer', function (offer) {
+      peer.createAnswer(offer, function (answer) {
+        console.log("Created answer",answer);
+        socket.emit('answer', answer);
+      });
+    });
   });
 });
 
