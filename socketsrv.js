@@ -48,7 +48,7 @@ io.on('connection', function (socket){
 
           // instruct the chosen client to create answer.
           console.log("Instructed client ",id," to create answer for the newcomer.");
-          clients[id].emit('createanswer', offers[id]);
+          clients[id].emit('createanswer', offer);
 
           break;
         }
