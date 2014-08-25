@@ -48,8 +48,9 @@ WebRTCPeer.prototype.createAnswer = function (desc, callback) {
     function () {
       peer.pc.createAnswer(
         function (answer) {
+          var answerdesc = new peer.RTCSessionDescription(answer);
           peer.pc.setLocalDescription(
-            new this.RTCSessionDescription(answer),
+            answerdesc,
             function () {
               callback(answer);
             }
