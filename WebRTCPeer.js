@@ -40,7 +40,7 @@ WebRTCPeer.prototype.createAnswer = function (offertxt, callback) {
   try {
     desc = JSON.parse(offertxt);
   } catch(e) {
-    console.log(e);
+    console.log("JSON Parse error:", e);
     return;
   }
   this.pc = new this.RTCPeerConnection(null);
@@ -111,3 +111,5 @@ WebRTCPeer.prototype.onMessage = function (event) {
     this.msgHandlers[i](event);
   }
 };
+
+module.exports = exports = WebRTCPeer;
