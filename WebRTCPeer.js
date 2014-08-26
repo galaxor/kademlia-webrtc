@@ -98,4 +98,6 @@ WebRTCPeer.prototype.onMessage = function (event) {
   }
 };
 
-module.exports = exports = WebRTCPeer;
+if (typeof module != "undefined") {
+  module.exports = exports = WebRTCPeer;
+}
