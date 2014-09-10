@@ -11,6 +11,8 @@ function WebRTCPeer (namespace) {
   this.localIceCandidateHandlers = [];
   this.dataChannelHandlers = [];
 
+  this.channelMessageHandlers = {};
+
   if (typeof namespace == "undefined") {
     this.RTCPeerConnection = RTCPeerConnection;
     this.RTCSessionDescription = RTCSessionDescription;
@@ -121,8 +123,16 @@ WebRTCPeer.prototype.doSetLocalDesc = function (desc) {
   );
 };
 
-WebRTCPeer.prototype.addDataChannelOpenHandler = function (handler) {
-  this.dataChannelopenHandlers.push(handler);
+WebRTCPeer.prototype.addDataChannelHandler = function (handler) {
+  this.dataChannelHandlers.push(handler);
+};
+
+
+WebRTCPeer.prototype.addChannelMessageHandler = function (channel, handler) {
+  if (typeof this.channelMessageHandlers[channel.label] == "undefined") {
+    this.channelMessageHandlers[channel.label] = [];
+  }
+  this.channelMessageHandlers[channel.label].push(handler);
 };
 
 WebRTCPeer.prototype.doHandleDataChannels = function () {
@@ -158,12 +168,10 @@ WebRTCPeer.prototype.doHandleDataChannels = function () {
     channel.onmessage = function(evt) {
       var data = evt.data;
       console.log('onmessage:', evt.data);
-      if('string' == typeof data) {
-        channel.send("Hello peer!");
-      } else {
-        var response = new Uint8Array([107, 99, 97, 0]);
-        channel.send(response.buffer);
-      }
+
+      peer.channelMessageHandlers[channel.label].forEach(function (handler) {
+        handler(channel, data);
+      });
     };
 
     channel.onclose = function() {
@@ -240,6 +248,17 @@ wss.on('connection', function(ws)
 
   peer.addAnswerCreatedHandler(function (answer) {
     ws.send(JSON.stringify(answer));
+  });
+
+  peer.addDataChannelHandler(function (channel) {
+    peer.addChannelMessageHandler(channel, function (channel, data) {
+      if('string' == typeof data) {
+        channel.send("Hello peer!");
+      } else {
+        var response = new Uint8Array([107, 99, 97, 0]);
+        channel.send(response.buffer);
+      }
+    });
   });
 
   ws.on('message', function(data)
