@@ -1,4 +1,4 @@
-function WebRTCPeer (namespace) {
+function WebRTCBridge (namespace) {
   this.pendingDataChannels = {};
   this.dataChannels = {}
   this.pendingCandidates = [];
@@ -31,7 +31,7 @@ function WebRTCPeer (namespace) {
   };
 }
 
-WebRTCPeer.prototype.recvOffer = function (data) {
+WebRTCBridge.prototype.recvOffer = function (data) {
   this.offer = new this.RTCSessionDescription(data);
   this.answer = null;
   this.remoteReceived = false;
@@ -63,7 +63,7 @@ WebRTCPeer.prototype.recvOffer = function (data) {
   this.doHandleDataChannels();
 };
 
-WebRTCPeer.prototype.recvRemoteIceCandidate = function (data) {
+WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
   if (this.remoteReceived) {
     this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
   } else {
@@ -71,11 +71,11 @@ WebRTCPeer.prototype.recvRemoteIceCandidate = function (data) {
   }
 };
 
-WebRTCPeer.prototype.addLocalIceCandidateHandler = function (handler) {
+WebRTCBridge.prototype.addLocalIceCandidateHandler = function (handler) {
   this.localIceCandidateHandlers.push(handler);
 };
 
-WebRTCPeer.prototype.xferIceCandidate = function (candidate) {
+WebRTCBridge.prototype.xferIceCandidate = function (candidate) {
   var iceCandidate = {
     'type': 'ice',
     'sdp': {
@@ -92,15 +92,15 @@ WebRTCPeer.prototype.xferIceCandidate = function (candidate) {
   });
 };
 
-WebRTCPeer.prototype.doComplete = function () {
+WebRTCBridge.prototype.doComplete = function () {
   console.info('complete');
 };
 
-WebRTCPeer.prototype.doHandleError = function (error) {
+WebRTCBridge.prototype.doHandleError = function (error) {
   throw error;
 }
 
-WebRTCPeer.prototype.doCreateAnswer = function () {
+WebRTCBridge.prototype.doCreateAnswer = function () {
   this.remoteReceived = true;
   var peer = this;
   this.pendingCandidates.forEach(function(candidate) {
@@ -112,7 +112,7 @@ WebRTCPeer.prototype.doCreateAnswer = function () {
   );
 };
 
-WebRTCPeer.prototype.doSetLocalDesc = function (desc) {
+WebRTCBridge.prototype.doSetLocalDesc = function (desc) {
   this.answer = desc;
   console.info("DESC:: ", desc);
   var peer = this;
@@ -123,30 +123,27 @@ WebRTCPeer.prototype.doSetLocalDesc = function (desc) {
   );
 };
 
-WebRTCPeer.prototype.addDataChannelHandler = function (handler) {
+WebRTCBridge.prototype.addDataChannelHandler = function (handler) {
   this.dataChannelHandlers.push(handler);
 };
 
 
-WebRTCPeer.prototype.addChannelMessageHandler = function (channel, handler) {
+WebRTCBridge.prototype.addChannelMessageHandler = function (channel, handler) {
   if (typeof this.channelMessageHandlers[channel.label] == "undefined") {
     this.channelMessageHandlers[channel.label] = [];
   }
   this.channelMessageHandlers[channel.label].push(handler);
 };
 
-WebRTCPeer.prototype.doHandleDataChannels = function () {
+WebRTCBridge.prototype.doHandleDataChannels = function () {
   var labels = Object.keys(this.dataChannelSettings);
 
   console.log("Handling data channels");
 
   var peer = this;
-  console.log("SET PEER == ", peer);
 
   this.pc.ondatachannel = function(evt) {
     var channel = evt.channel;
-
-    console.log("Recognize me, peer? ", peer);
 
     console.log('ondatachannel', channel.label, channel.readyState);
     var label = channel.label;
@@ -184,7 +181,7 @@ WebRTCPeer.prototype.doHandleDataChannels = function () {
   this.doSetRemoteDesc();
 };
 
-WebRTCPeer.prototype.doSetRemoteDesc = function () {
+WebRTCBridge.prototype.doSetRemoteDesc = function () {
   console.info(this.offer);
   var peer = this;
   this.pc.setRemoteDescription(
@@ -194,11 +191,11 @@ WebRTCPeer.prototype.doSetRemoteDesc = function () {
   );
 };
 
-WebRTCPeer.prototype.addAnswerCreatedHandler = function (handler) {
+WebRTCBridge.prototype.addAnswerCreatedHandler = function (handler) {
   this.answerCreatedHandlers.push(handler);
 };
 
-WebRTCPeer.prototype.doSendAnswer = function () {
+WebRTCBridge.prototype.doSendAnswer = function () {
   console.log("Sending answer:", this.answer);
   var peer = this;
   this.answerCreatedHandlers.forEach(function(handler) {
@@ -218,10 +215,10 @@ var host = args.h || '127.0.0.1';
 var port = args.p || 8080;
 var socketPort = args.ws || 9001;
 
-var file = new static.Server('./node_modules/wrtc/examples', {
+var file = new static.Server('./', {
     alias: {
         match: '/dist/wrtc.js',
-        serve: '../dist/wrtc.js',
+        serve: 'node_modules/wrtc/dist/wrtc.js',
         allowOutside: true
       }
     });
@@ -240,7 +237,7 @@ wss.on('connection', function(ws)
 {
   console.info('ws connected');
 
-  var peer = new WebRTCPeer(webrtc);
+  var peer = new WebRTCBridge(webrtc);
 
   peer.addLocalIceCandidateHandler(function (iceCandidate) {
     ws.send(JSON.stringify(iceCandidate));
