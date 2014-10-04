@@ -196,6 +196,11 @@ WebRTCPeer.prototype.sendPendingIceCandidates = function (handler) {
   });
 };
 
+WebRTCPeer.prototype.addIceCandidate = function (candidate) {
+  var candidateObj = new this.RTCIceCandidate(candidate);
+  this.pc.addIceCandidate(candidateObj);
+};
+
 (function() {
 
 var host = window.location.host.split(':')[0];
@@ -231,8 +236,7 @@ ws.onmessage = function(event) {
     peer.doSetRemoteDesc(data);
   } else if('ice' == data.type) {
     console.log(data);
-    var candidate = new peer.RTCIceCandidate(data.sdp.candidate);
-    peer.pc.addIceCandidate(candidate);
+    peer.addIceCandidate(data.sdp.candidate);
   }
 };
 
