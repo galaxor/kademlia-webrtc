@@ -161,6 +161,12 @@ WebRTCBridge.prototype.doHandleDataChannels = function () {
         handler(channel);
       });
     };
+    if (channel.readyState == "open") {
+      // Manully open the channel in case it was created in the open state.  If
+      // that happens, we don't set the "onopen" until later, so it will never
+      // be called.  Therefore, we detect that case and call it here.
+      channel.onopen();
+    }
 
     channel.onmessage = function(evt) {
       var data = evt.data;
@@ -233,9 +239,8 @@ var app = http.createServer(function (req, res) {
 console.log('Server running at http://' + host + ':' + port + '/');
 
 var wss = new ws.Server({'port': socketPort});
-wss.on('connection', function(ws)
-{
-  console.info('ws connected');
+wss.on('connection', function(ws) {
+  console.info('~~~~~ ws connected ~~~~~~');
 
   var peer = new WebRTCBridge(webrtc);
 
