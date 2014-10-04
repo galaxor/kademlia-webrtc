@@ -16,10 +16,34 @@ function WebRTCPeer(bridge) {
   this.pendingDataChannels = {};
   this.dataChannels = {};
   this.pendingCandidates = [];
-  this.ws = null;
   this.pc = null;
   this.bridge = bridge;
+
+  this.iceXferReadyCallbacks = [];
+  this.localIceCandidateHandlers = [];
+  this.sendOfferHandlers = [];
 }
+
+WebRTCPeer.prototype.iceXferReady = function () {
+  var ready = null;
+  this.iceXferReadyCallbacks.every(function (cb) {
+    ready = cb();
+    return ready;
+  });
+  return ready;
+};
+
+WebRTCPeer.prototype.addLocalIceCandidateHandler = function (handler) {
+  this.localIceCandidateHandlers.push(handler);
+};
+
+WebRTCPeer.prototype.addIceXferReadyCallback = function (cb) {
+  this.iceXferReadyCallbacks.push(cb);
+};
+
+WebRTCPeer.prototype.addSendOfferHandler = function (handler) {
+  this.sendOfferHandlers.push(handler);
+};
 
 WebRTCPeer.prototype.doHandleError = function (error) {
   throw error;
@@ -58,12 +82,8 @@ WebRTCPeer.prototype.init = function () {
   this.pc.onicecandidate = function(event) {
     var candidate = event.candidate;
     if(!candidate) return;
-    if(WebSocket.OPEN == peer.ws.readyState) {
-      peer.ws.send(JSON.stringify(
-        {'type': 'ice',
-         'sdp': {'candidate': candidate.candidate, 'sdpMid': candidate.sdpMid, 'sdpMLineIndex': candidate.sdpMLineIndex}
-        })
-      );
+    if (peer.iceXferReady()) {
+      peer.xferIceCandidate(candidate);
     } else {
       peer.pendingCandidates.push(candidate);
     }
@@ -72,12 +92,30 @@ WebRTCPeer.prototype.init = function () {
   this.doCreateDataChannels();
 };
 
+WebRTCPeer.prototype.xferIceCandidate = function (candidate) {
+  var iceCandidate = {
+    'type': 'ice',
+    'sdp': {
+      'candidate': candidate.candidate,
+      'sdpMid': candidate.sdpMid,
+      'sdpMLineIndex': candidate.sdpMLineIndex
+    }
+  };
+
+  console.info(JSON.stringify(iceCandidate));
+
+  this.localIceCandidateHandlers.forEach(function (handler) {
+    handler(iceCandidate);
+  });
+};
+
 WebRTCPeer.prototype.doCreateDataChannels = function () {
   var peer = this;
   var labels = Object.keys(this.dataChannelSettings);
   labels.forEach(function(label) {
     var channelOptions = peer.dataChannelSettings[label];
     var channel = peer.pendingDataChannels[label] = peer.pc.createDataChannel(label, channelOptions);
+    console.log(channel);
     channel.binaryType = 'arraybuffer';
     channel.onopen = function() {
       console.info('onopen');
@@ -122,30 +160,16 @@ WebRTCPeer.prototype.doSetLocalDesc = function (desc) {
 
 WebRTCPeer.prototype.doSendOffer = function (offer) {
   var peer = this;
-  this.ws = new WebSocket("ws://" + this.bridge);
-  this.ws.onopen = function() {
-    peer.pendingCandidates.forEach(function(candidate) {
-      peer.ws.send(JSON.stringify(
-        {'type': 'ice',
-         'sdp': {'candidate': candidate.candidate, 'sdpMid': candidate.sdpMid, 'sdpMLineIndex': candidate.sdpMLineIndex}
-        })
-      );
-    });
-    peer.ws.send(JSON.stringify(
-      {'type': offer.type, 'sdp': offer.sdp})
-    );
+  console.log("Sending offer: ", offer);
+
+  var offerObj = {
+    'type': offer.type,
+    'sdp': offer.sdp,
   };
-  this.ws.onmessage = function(event) {
-    var data = JSON.parse(event.data);
-    if('answer' == data.type)
-    {
-      peer.doSetRemoteDesc(data);
-    } else if('ice' == data.type) {
-      console.log(data);
-      var candidate = new peer.RTCIceCandidate(data.sdp.candidate);
-      peer.pc.addIceCandidate(candidate);
-    }
-  };
+
+  this.sendOfferHandlers.forEach(function (handler) {
+    handler(offerObj);
+  });
 };
 
 WebRTCPeer.prototype.doSetRemoteDesc = function (desc) {
@@ -157,12 +181,59 @@ WebRTCPeer.prototype.doSetRemoteDesc = function (desc) {
   );
 };
 
+WebRTCPeer.prototype.sendPendingIceCandidates = function (handler) {
+  this.pendingCandidates.forEach(function(candidate) {
+    candidateObj = {
+      'type': 'ice',
+      'sdp': {
+        'candidate': candidate.candidate,
+        'sdpMid': candidate.sdpMid,
+        'sdpMLineIndex': candidate.sdpMLineIndex
+      }
+    };
+
+    handler(candidateObj);
+  });
+};
+
 (function() {
 
 var host = window.location.host.split(':')[0];
 var bridge = window.location.toString().split('?')[1] || host + ':9001';
 
+var ws = null;
+ws = new WebSocket("ws://" + bridge);
+
 var peer = new WebRTCPeer(bridge);
-peer.init();
+
+peer.addLocalIceCandidateHandler(function (candidate) {
+  ws.send(JSON.stringify(candidate));
+});
+peer.addIceXferReadyCallback(function (cb) {
+  return WebSocket.OPEN == ws.readyState;
+});
+
+ws.onopen = function() {
+  peer.sendPendingIceCandidates(function (candidate) {
+    ws.send(JSON.stringify(candidate));
+  });
+
+  peer.addSendOfferHandler(function (offer) {
+    ws.send(JSON.stringify(offer));
+  });
+
+  peer.init();
+};
+
+ws.onmessage = function(event) {
+  var data = JSON.parse(event.data);
+  if('answer' == data.type) {
+    peer.doSetRemoteDesc(data);
+  } else if('ice' == data.type) {
+    console.log(data);
+    var candidate = new peer.RTCIceCandidate(data.sdp.candidate);
+    peer.pc.addIceCandidate(candidate);
+  }
+};
 
 })();
