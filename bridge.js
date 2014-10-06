@@ -166,6 +166,7 @@ WebRTCBridge.prototype.doHandleDataChannels = function () {
       // that happens, we don't set the "onopen" until later, so it will never
       // be called.  Therefore, we detect that case and call it here.
       channel.onopen();
+      channel.onopen = undefined;
     }
 
     channel.onmessage = function(evt) {

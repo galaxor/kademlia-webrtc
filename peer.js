@@ -126,7 +126,7 @@ WebRTCPeer.prototype.doCreateDataChannels = function () {
     console.log(channel);
     channel.binaryType = 'arraybuffer';
     channel.onopen = function() {
-      console.info('onopen');
+      console.info('onopen', label);
       peer.dataChannels[label] = channel;
       delete peer.pendingDataChannels[label];
       if(Object.keys(peer.dataChannels).length === labels.length) {
