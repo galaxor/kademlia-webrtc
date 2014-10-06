@@ -3,7 +3,6 @@ function WebRTCBridge (namespace) {
   this.dataChannels = {}
   this.pendingCandidates = [];
   this.pc = null;
-  this.offer = null;
   this.answer = null;
   this.remoteReceived = false;
 
@@ -32,7 +31,7 @@ function WebRTCBridge (namespace) {
 }
 
 WebRTCBridge.prototype.recvOffer = function (data) {
-  this.offer = new this.RTCSessionDescription(data);
+  var offer = new this.RTCSessionDescription(data);
   this.answer = null;
   this.remoteReceived = false;
 
@@ -60,7 +59,7 @@ WebRTCBridge.prototype.recvOffer = function (data) {
     peer.xferIceCandidate(candidate);
   }
 
-  this.doHandleDataChannels();
+  this.doHandleDataChannels(offer);
 };
 
 WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
@@ -135,7 +134,7 @@ WebRTCBridge.prototype.addChannelMessageHandler = function (channel, handler) {
   this.channelMessageHandlers[channel.label].push(handler);
 };
 
-WebRTCBridge.prototype.doHandleDataChannels = function () {
+WebRTCBridge.prototype.doHandleDataChannels = function (offer) {
   var labels = Object.keys(this.dataChannelSettings);
 
   console.log("Handling data channels");
@@ -185,14 +184,14 @@ WebRTCBridge.prototype.doHandleDataChannels = function () {
     channel.onerror = peer.doHandleError.bind(peer);
   };
 
-  this.doSetRemoteDesc();
+  this.doSetRemoteDesc(offer);
 };
 
-WebRTCBridge.prototype.doSetRemoteDesc = function () {
-  console.info(this.offer);
+WebRTCBridge.prototype.doSetRemoteDesc = function (offer) {
+  console.info(offer);
   var peer = this;
   this.pc.setRemoteDescription(
-    this.offer,
+    offer,
     peer.doCreateAnswer.bind(peer),
     peer.doHandleError.bind(peer)
   );
