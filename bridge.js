@@ -264,14 +264,11 @@ wss.on('connection', function(ws) {
     });
   });
 
-  ws.on('message', function(data)
-  {
+  ws.on('message', function(data) {
     data = JSON.parse(data);
-    if('offer' == data.type)
-    {
+    if('offer' == data.type) {
       peer.recvOffer(data);
-    } else if('ice' == data.type)
-    {
+    } else if('ice' == data.type) {
       peer.recvRemoteIceCandidate(data);
     }
   });
