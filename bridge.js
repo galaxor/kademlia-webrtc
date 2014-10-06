@@ -3,7 +3,6 @@ function WebRTCBridge (namespace) {
   this.dataChannels = {}
   this.pendingCandidates = [];
   this.pc = null;
-  this.answer = null;
   this.remoteReceived = false;
 
   this.answerCreatedHandlers = [];
@@ -32,7 +31,6 @@ function WebRTCBridge (namespace) {
 
 WebRTCBridge.prototype.recvOffer = function (data) {
   var offer = new this.RTCSessionDescription(data);
-  this.answer = null;
   this.remoteReceived = false;
 
   this.pc = new this.RTCPeerConnection(
@@ -112,12 +110,12 @@ WebRTCBridge.prototype.doCreateAnswer = function () {
 };
 
 WebRTCBridge.prototype.doSetLocalDesc = function (desc) {
-  this.answer = desc;
+  var answer = desc;
   console.info("DESC:: ", desc);
   var peer = this;
   this.pc.setLocalDescription(
     desc,
-    peer.doSendAnswer.bind(peer),
+    peer.doSendAnswer.bind(peer, answer),
     peer.doHandleError.bind(peer)
   );
 };
@@ -201,11 +199,11 @@ WebRTCBridge.prototype.addAnswerCreatedHandler = function (handler) {
   this.answerCreatedHandlers.push(handler);
 };
 
-WebRTCBridge.prototype.doSendAnswer = function () {
-  console.log("Sending answer:", this.answer);
+WebRTCBridge.prototype.doSendAnswer = function (answer) {
+  console.log("Sending answer:", answer);
   var peer = this;
   this.answerCreatedHandlers.forEach(function(handler) {
-    handler(peer.answer);
+    handler(answer);
   });
   console.log("Awaiting data channels");
 };
