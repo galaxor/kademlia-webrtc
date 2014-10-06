@@ -107,8 +107,8 @@ WebRTCBridge.prototype.doCreateAnswer = function () {
     peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
   });
   this.pc.createAnswer(
-    function (desc) { peer.doSetLocalDesc(desc); },
-    function (error) { peer.doHandleError(error); }
+    peer.doSetLocalDesc.bind(peer),
+    peer.doHandleError.bind(peer)
   );
 };
 
@@ -118,8 +118,8 @@ WebRTCBridge.prototype.doSetLocalDesc = function (desc) {
   var peer = this;
   this.pc.setLocalDescription(
     desc,
-    function () { peer.doSendAnswer(); },
-    function (error) { peer.doHandleError(error); }
+    peer.doSendAnswer.bind(peer),
+    peer.doHandleError.bind(peer)
   );
 };
 
@@ -182,7 +182,7 @@ WebRTCBridge.prototype.doHandleDataChannels = function () {
       console.info('onclose');
     };
 
-    channel.onerror = function (error) { peer.doHandleError(error); };
+    channel.onerror = peer.doHandleError.bind(peer);
   };
 
   this.doSetRemoteDesc();
@@ -193,8 +193,8 @@ WebRTCBridge.prototype.doSetRemoteDesc = function () {
   var peer = this;
   this.pc.setRemoteDescription(
     this.offer,
-    function () { peer.doCreateAnswer(); },
-    function (error) { peer.doHandleError(error); }
+    peer.doCreateAnswer.bind(peer),
+    peer.doHandleError.bind(peer)
   );
 };
 
