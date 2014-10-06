@@ -1,10 +1,14 @@
-function WebRTCPeer(bridge) {
+function WebRTCPeer () {
+  this.pendingDataChannels = {};
+  this.dataChannels = {};
+  this.pendingCandidates = [];
+  this.pc = null;
+
   // We expect you to have included ../dist/wrtc.js via a <script> tag before
   // including this one.  That will give us the definition of wrtc.
-
-  this.RTCPeerConnection     = wrtc.RTCPeerConnection;
+  this.RTCPeerConnection = wrtc.RTCPeerConnection;
   this.RTCSessionDescription = wrtc.RTCSessionDescription;
-  this.RTCIceCandidate       = wrtc.RTCIceCandidate;
+  this.RTCIceCandidate = wrtc.RTCIceCandidate;
 
   this.dataChannelSettings = {
     'reliable': {
@@ -12,12 +16,6 @@ function WebRTCPeer(bridge) {
           maxRetransmitNum: 10
         },
   };
-
-  this.pendingDataChannels = {};
-  this.dataChannels = {};
-  this.pendingCandidates = [];
-  this.pc = null;
-  this.bridge = bridge;
 
   this.iceXferReadyCallbacks = [];
   this.localIceCandidateHandlers = [];
@@ -144,7 +142,7 @@ WebRTCPeer.prototype.doCreateDataChannels = function () {
     channel.onclose = function(event) {
       console.info('onclose');
     };
-    channel.onerror = function (error) { peer.doHandleError(error); };
+    channel.onerror = peer.doHandleError.bind(peer);
   });
   this.doCreateOffer();
 };
@@ -152,8 +150,8 @@ WebRTCPeer.prototype.doCreateDataChannels = function () {
 WebRTCPeer.prototype.doCreateOffer = function () {
   var peer = this;
   this.pc.createOffer(
-    function (desc) { peer.doSetLocalDesc(desc); },
-    function (error) { peer.doHandleError(error); }
+    this.doSetLocalDesc.bind(peer),
+    this.doHandleError.bind(peer)
   );
 }
 
@@ -162,7 +160,7 @@ WebRTCPeer.prototype.doSetLocalDesc = function (desc) {
   this.pc.setLocalDescription(
     new this.RTCSessionDescription(desc),
     this.doSendOffer.bind(peer, desc),
-    function (error) { peer.doHandleError(error); }
+    this.doHandleError.bind(peer)
   );
 }
 
@@ -184,8 +182,8 @@ WebRTCPeer.prototype.doSetRemoteDesc = function (desc) {
   var peer = this;
   this.pc.setRemoteDescription(
     new peer.RTCSessionDescription(desc),
-    function () { peer.doWaitforDataChannels(); },
-    function (error) { peer.doHandleError(error); }
+    peer.doWaitforDataChannels.bind(peer),
+    peer.doHandleError.bind(peer)
   );
 };
 
@@ -217,7 +215,7 @@ var bridge = window.location.toString().split('?')[1] || host + ':9001';
 var ws = null;
 ws = new WebSocket("ws://" + bridge);
 
-var peer = new WebRTCPeer(bridge);
+var peer = new WebRTCPeer(wrtc);
 
 peer.addLocalIceCandidateHandler(function (candidate) {
   ws.send(JSON.stringify(candidate));
