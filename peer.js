@@ -20,6 +20,7 @@ function WebRTCPeer () {
   this.iceXferReadyCallbacks = [];
   this.localIceCandidateHandlers = [];
   this.sendOfferHandlers = [];
+  this.dataChannelsOpenCallbacks = [];
 }
 
 WebRTCPeer.prototype._iceXferReady = function () {
@@ -43,15 +44,20 @@ WebRTCPeer.prototype.addSendOfferHandler = function (handler) {
   this.sendOfferHandlers.push(handler);
 };
 
+WebRTCPeer.prototype.addDataChannelsReadyCallback = function (cb) {
+  this.dataChannelsOpenCallbacks.push(cb);
+};
+
 WebRTCPeer.prototype._doHandleError = function (error) {
   throw error;
 };
 
 WebRTCPeer.prototype._doAllDataChannelsOpen = function () {
+  var peer = this;
   console.log('complete');
-  var data = new Uint8Array([97, 99, 107, 0]);
-  this.dataChannels['reliable'].send(data.buffer);
-  this.dataChannels['reliable'].send("Hello bridge!");
+  this.dataChannelsOpenCallbacks.forEach(function (cb) {
+    cb(peer.dataChannels);
+  });
 };
 
 WebRTCPeer.prototype._doWaitforDataChannels = function () {
@@ -222,6 +228,11 @@ peer.addLocalIceCandidateHandler(function (candidate) {
 });
 peer.addIceXferReadyCallback(function (cb) {
   return WebSocket.OPEN == ws.readyState;
+});
+peer.addDataChannelsReadyCallback(function (dataChannels) {
+  var data = new Uint8Array([97, 99, 107, 0]);
+  dataChannels['reliable'].send(data.buffer);
+  dataChannels['reliable'].send("Hello bridge!");
 });
 
 ws.onopen = function() {
