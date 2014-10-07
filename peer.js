@@ -75,15 +75,7 @@ WebRTCPeer.prototype.init = function () {
     }
   );
   this.pc.onsignalingstatechange = function(event) {
-    var signalingState;
-    if (typeof event == "object") {
-      // Chromium
-      signalingState = event.target.signalingState;
-    } else {
-      // Firefox
-      signalingState = event;
-    }
-    console.info("signaling state change: ", signalingState);
+    console.info('signaling state change:', event);
   };
   this.pc.oniceconnectionstatechange = function(event) {
     console.info("ice connection state change: ", event.target.iceConnectionState);

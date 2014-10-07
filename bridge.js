@@ -42,8 +42,8 @@ WebRTCBridge.prototype.recvOffer = function (data) {
     }
   );
 
-  this.pc.onsignalingstatechange = function(state) {
-    console.info('signaling state change:', state);
+  this.pc.onsignalingstatechange = function(event) {
+    console.info('signaling state change:', event);
   };
   this.pc.oniceconnectionstatechange = function(state) {
     console.info('ice connection state change:', state);
