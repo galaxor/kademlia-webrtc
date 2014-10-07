@@ -89,7 +89,7 @@ WebRTCBridge.prototype._xferIceCandidate = function (candidate) {
   });
 };
 
-WebRTCBridge.prototype._doAllChannelsOpen = function () {
+WebRTCBridge.prototype._doAllDataChannelsOpen = function () {
   console.info('complete');
 };
 
@@ -151,7 +151,7 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
       peer.dataChannels[label] = channel;
       delete peer.pendingDataChannels[label];
       if(Object.keys(peer.dataChannels).length === labels.length) {
-        peer._doAllChannelsOpen();
+        peer._doAllDataChannelsOpen();
       }
 
       peer.dataChannelHandlers.forEach(function (handler) {

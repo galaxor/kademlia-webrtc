@@ -22,7 +22,7 @@ function WebRTCPeer () {
   this.sendOfferHandlers = [];
 }
 
-WebRTCPeer.prototype.iceXferReady = function () {
+WebRTCPeer.prototype._iceXferReady = function () {
   var ready = null;
   this.iceXferReadyCallbacks.every(function (cb) {
     ready = cb();
@@ -43,18 +43,18 @@ WebRTCPeer.prototype.addSendOfferHandler = function (handler) {
   this.sendOfferHandlers.push(handler);
 };
 
-WebRTCPeer.prototype.doHandleError = function (error) {
+WebRTCPeer.prototype._doHandleError = function (error) {
   throw error;
 };
 
-WebRTCPeer.prototype.doComplete = function () {
+WebRTCPeer.prototype._doAllDataChannelsOpen = function () {
   console.log('complete');
   var data = new Uint8Array([97, 99, 107, 0]);
   this.dataChannels['reliable'].send(data.buffer);
   this.dataChannels['reliable'].send("Hello bridge!");
 };
 
-WebRTCPeer.prototype.doWaitforDataChannels = function () {
+WebRTCPeer.prototype._doWaitforDataChannels = function () {
   console.log('awaiting data channels');
 };
 
@@ -88,17 +88,17 @@ WebRTCPeer.prototype.init = function () {
   this.pc.onicecandidate = function(event) {
     var candidate = event.candidate;
     if(!candidate) return;
-    if (peer.iceXferReady()) {
-      peer.xferIceCandidate(candidate);
+    if (peer._iceXferReady()) {
+      peer._xferIceCandidate(candidate);
     } else {
       peer.pendingCandidates.push(candidate);
     }
   };
 
-  this.doCreateDataChannels();
+  this._doCreateDataChannels();
 };
 
-WebRTCPeer.prototype.xferIceCandidate = function (candidate) {
+WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
   var iceCandidate = {
     'type': 'ice',
     'sdp': {
@@ -115,7 +115,7 @@ WebRTCPeer.prototype.xferIceCandidate = function (candidate) {
   });
 };
 
-WebRTCPeer.prototype.doCreateDataChannels = function () {
+WebRTCPeer.prototype._doCreateDataChannels = function () {
   var peer = this;
   var labels = Object.keys(this.dataChannelSettings);
   labels.forEach(function(label) {
@@ -128,7 +128,7 @@ WebRTCPeer.prototype.doCreateDataChannels = function () {
       peer.dataChannels[label] = channel;
       delete peer.pendingDataChannels[label];
       if(Object.keys(peer.dataChannels).length === labels.length) {
-        peer.doComplete();
+        peer._doAllDataChannelsOpen();
       }
     };
     channel.onmessage = function(event) {
@@ -142,29 +142,29 @@ WebRTCPeer.prototype.doCreateDataChannels = function () {
     channel.onclose = function(event) {
       console.info('onclose');
     };
-    channel.onerror = peer.doHandleError.bind(peer);
+    channel.onerror = peer._doHandleError.bind(peer);
   });
-  this.doCreateOffer();
+  this._doCreateOffer();
 };
 
-WebRTCPeer.prototype.doCreateOffer = function () {
+WebRTCPeer.prototype._doCreateOffer = function () {
   var peer = this;
   this.pc.createOffer(
-    this.doSetLocalDesc.bind(peer),
-    this.doHandleError.bind(peer)
+    this._doSetLocalDesc.bind(peer),
+    this._doHandleError.bind(peer)
   );
 }
 
-WebRTCPeer.prototype.doSetLocalDesc = function (desc) {
+WebRTCPeer.prototype._doSetLocalDesc = function (desc) {
   var peer = this;
   this.pc.setLocalDescription(
     new this.RTCSessionDescription(desc),
-    this.doSendOffer.bind(peer, desc),
-    this.doHandleError.bind(peer)
+    this._doSendOffer.bind(peer, desc),
+    this._doHandleError.bind(peer)
   );
 }
 
-WebRTCPeer.prototype.doSendOffer = function (offer) {
+WebRTCPeer.prototype._doSendOffer = function (offer) {
   var peer = this;
   console.log("Sending offer: ", offer);
 
@@ -178,12 +178,12 @@ WebRTCPeer.prototype.doSendOffer = function (offer) {
   });
 };
 
-WebRTCPeer.prototype.doSetRemoteDesc = function (desc) {
+WebRTCPeer.prototype._doSetRemoteDesc = function (desc) {
   var peer = this;
   this.pc.setRemoteDescription(
     new peer.RTCSessionDescription(desc),
-    peer.doWaitforDataChannels.bind(peer),
-    peer.doHandleError.bind(peer)
+    peer._doWaitforDataChannels.bind(peer),
+    peer._doHandleError.bind(peer)
   );
 };
 
@@ -239,7 +239,7 @@ ws.onopen = function() {
 ws.onmessage = function(event) {
   var data = JSON.parse(event.data);
   if('answer' == data.type) {
-    peer.doSetRemoteDesc(data);
+    peer._doSetRemoteDesc(data);
   } else if('ice' == data.type) {
     console.log(data);
     peer.addIceCandidate(data.sdp.candidate);
