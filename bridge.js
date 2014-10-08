@@ -1,7 +1,7 @@
 function WebRTCBridge (namespace) {
   this.pendingDataChannels = {};
   this.dataChannels = {}
-  this.pendingCandidates = [];
+  this.pendingIceCandidates = [];
   this.pc = null;
   this.remoteReceived = false;
 
@@ -64,7 +64,7 @@ WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
   if (this.remoteReceived) {
     this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
   } else {
-    this.pendingCandidates.push(data);
+    this.pendingIceCandidates.push(data);
   }
 };
 
@@ -100,7 +100,7 @@ WebRTCBridge.prototype._doHandleError = function (error) {
 WebRTCBridge.prototype._doCreateAnswer = function () {
   this.remoteReceived = true;
   var peer = this;
-  this.pendingCandidates.forEach(function(candidate) {
+  this.pendingIceCandidates.forEach(function(candidate) {
     peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
   });
   this.pc.createAnswer(

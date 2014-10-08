@@ -1,7 +1,7 @@
 function WebRTCPeer () {
   this.pendingDataChannels = {};
   this.dataChannels = {};
-  this.pendingCandidates = [];
+  this.pendingIceCandidates = [];
   this.pc = null;
 
   // We expect you to have included ../dist/wrtc.js via a <script> tag before
@@ -89,7 +89,7 @@ WebRTCPeer.prototype.createOffer = function () {
     if (peer._iceXferReady()) {
       peer._xferIceCandidate(candidate);
     } else {
-      peer.pendingCandidates.push(candidate);
+      peer.pendingIceCandidates.push(candidate);
     }
   };
 
@@ -187,7 +187,7 @@ WebRTCPeer.prototype._doSetRemoteDesc = function (desc) {
 
 WebRTCPeer.prototype.sendPendingIceCandidates = function () {
   var peer = this;
-  this.pendingCandidates.forEach(function(candidate) {
+  this.pendingIceCandidates.forEach(function(candidate) {
     peer._xferIceCandidate(candidate);
   });
 };
