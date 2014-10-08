@@ -60,78 +60,6 @@ WebRTCBridge.prototype.recvOffer = function (data) {
   this._doCreateDataChannelCallback(offer);
 };
 
-WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
-  if (this.remoteReceived) {
-    this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
-  } else {
-    this.pendingIceCandidates.push(data);
-  }
-};
-
-WebRTCBridge.prototype.addLocalIceCandidateHandler = function (handler) {
-  this.localIceCandidateHandlers.push(handler);
-};
-
-WebRTCBridge.prototype._xferIceCandidate = function (candidate) {
-  var iceCandidate = {
-    'type': 'ice',
-    'sdp': {
-      'candidate': candidate.candidate,
-      'sdpMid': candidate.sdpMid,
-      'sdpMLineIndex': candidate.sdpMLineIndex
-    }
-  };
-
-  console.info(JSON.stringify(iceCandidate));
-
-  this.localIceCandidateHandlers.forEach(function (handler) {
-    handler(iceCandidate);
-  });
-};
-
-WebRTCBridge.prototype._doAllDataChannelsOpen = function () {
-  console.info('complete');
-};
-
-WebRTCBridge.prototype._doHandleError = function (error) {
-  throw error;
-}
-
-WebRTCBridge.prototype._doCreateAnswer = function () {
-  this.remoteReceived = true;
-  var peer = this;
-  this.pendingIceCandidates.forEach(function(candidate) {
-    peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
-  });
-  this.pc.createAnswer(
-    peer._doSetLocalDesc.bind(peer),
-    peer._doHandleError.bind(peer)
-  );
-};
-
-WebRTCBridge.prototype._doSetLocalDesc = function (desc) {
-  var answer = desc;
-  console.info("DESC:: ", desc);
-  var peer = this;
-  this.pc.setLocalDescription(
-    desc,
-    peer._doSendAnswer.bind(peer, answer),
-    peer._doHandleError.bind(peer)
-  );
-};
-
-WebRTCBridge.prototype.addDataChannelHandler = function (handler) {
-  this.dataChannelHandlers.push(handler);
-};
-
-
-WebRTCBridge.prototype.addChannelMessageHandler = function (channel, handler) {
-  if (typeof this.channelMessageHandlers[channel.label] == "undefined") {
-    this.channelMessageHandlers[channel.label] = [];
-  }
-  this.channelMessageHandlers[channel.label].push(handler);
-};
-
 WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
   var labels = Object.keys(this.dataChannelSettings);
 
@@ -195,8 +123,27 @@ WebRTCBridge.prototype._doSetRemoteDesc = function (offer) {
   );
 };
 
-WebRTCBridge.prototype.addAnswerCreatedHandler = function (handler) {
-  this.answerCreatedHandlers.push(handler);
+WebRTCBridge.prototype._doCreateAnswer = function () {
+  this.remoteReceived = true;
+  var peer = this;
+  this.pendingIceCandidates.forEach(function(candidate) {
+    peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
+  });
+  this.pc.createAnswer(
+    peer._doSetLocalDesc.bind(peer),
+    peer._doHandleError.bind(peer)
+  );
+};
+
+WebRTCBridge.prototype._doSetLocalDesc = function (desc) {
+  var answer = desc;
+  console.info("DESC:: ", desc);
+  var peer = this;
+  this.pc.setLocalDescription(
+    desc,
+    peer._doSendAnswer.bind(peer, answer),
+    peer._doHandleError.bind(peer)
+  );
 };
 
 WebRTCBridge.prototype._doSendAnswer = function (answer) {
@@ -206,6 +153,59 @@ WebRTCBridge.prototype._doSendAnswer = function (answer) {
     handler(answer);
   });
   console.log("Awaiting data channels");
+};
+
+WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
+  if (this.remoteReceived) {
+    this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
+  } else {
+    this.pendingIceCandidates.push(data);
+  }
+};
+
+WebRTCBridge.prototype.addLocalIceCandidateHandler = function (handler) {
+  this.localIceCandidateHandlers.push(handler);
+};
+
+WebRTCBridge.prototype._xferIceCandidate = function (candidate) {
+  var iceCandidate = {
+    'type': 'ice',
+    'sdp': {
+      'candidate': candidate.candidate,
+      'sdpMid': candidate.sdpMid,
+      'sdpMLineIndex': candidate.sdpMLineIndex
+    }
+  };
+
+  console.info(JSON.stringify(iceCandidate));
+
+  this.localIceCandidateHandlers.forEach(function (handler) {
+    handler(iceCandidate);
+  });
+};
+
+WebRTCBridge.prototype._doAllDataChannelsOpen = function () {
+  console.info('complete');
+};
+
+WebRTCBridge.prototype._doHandleError = function (error) {
+  throw error;
+}
+
+WebRTCBridge.prototype.addDataChannelHandler = function (handler) {
+  this.dataChannelHandlers.push(handler);
+};
+
+
+WebRTCBridge.prototype.addChannelMessageHandler = function (channel, handler) {
+  if (typeof this.channelMessageHandlers[channel.label] == "undefined") {
+    this.channelMessageHandlers[channel.label] = [];
+  }
+  this.channelMessageHandlers[channel.label].push(handler);
+};
+
+WebRTCBridge.prototype.addAnswerCreatedHandler = function (handler) {
+  this.answerCreatedHandlers.push(handler);
 };
 
 
