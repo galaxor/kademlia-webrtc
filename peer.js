@@ -64,7 +64,7 @@ WebRTCPeer.prototype._doWaitforDataChannels = function () {
   console.log('awaiting data channels');
 };
 
-WebRTCPeer.prototype.init = function () {
+WebRTCPeer.prototype.createOffer = function () {
   var peer = this;
   this.pc = new this.RTCPeerConnection(
     {
@@ -94,23 +94,6 @@ WebRTCPeer.prototype.init = function () {
   };
 
   this._doCreateDataChannels();
-};
-
-WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
-  var iceCandidate = {
-    'type': 'ice',
-    'sdp': {
-      'candidate': candidate.candidate,
-      'sdpMid': candidate.sdpMid,
-      'sdpMLineIndex': candidate.sdpMLineIndex
-    }
-  };
-
-  console.info(JSON.stringify(iceCandidate));
-
-  this.localIceCandidateHandlers.forEach(function (handler) {
-    handler(iceCandidate);
-  });
 };
 
 WebRTCPeer.prototype._doCreateDataChannels = function () {
@@ -176,6 +159,23 @@ WebRTCPeer.prototype._doSendOffer = function (offer) {
   });
 };
 
+WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
+  var iceCandidate = {
+    'type': 'ice',
+    'sdp': {
+      'candidate': candidate.candidate,
+      'sdpMid': candidate.sdpMid,
+      'sdpMLineIndex': candidate.sdpMLineIndex
+    }
+  };
+
+  console.info(JSON.stringify(iceCandidate));
+
+  this.localIceCandidateHandlers.forEach(function (handler) {
+    handler(iceCandidate);
+  });
+};
+
 WebRTCPeer.prototype._doSetRemoteDesc = function (desc) {
   var peer = this;
   this.pc.setRemoteDescription(
@@ -185,18 +185,10 @@ WebRTCPeer.prototype._doSetRemoteDesc = function (desc) {
   );
 };
 
-WebRTCPeer.prototype.sendPendingIceCandidates = function (handler) {
+WebRTCPeer.prototype.sendPendingIceCandidates = function () {
+  var peer = this;
   this.pendingCandidates.forEach(function(candidate) {
-    candidateObj = {
-      'type': 'ice',
-      'sdp': {
-        'candidate': candidate.candidate,
-        'sdpMid': candidate.sdpMid,
-        'sdpMLineIndex': candidate.sdpMLineIndex
-      }
-    };
-
-    handler(candidateObj);
+    peer._xferIceCandidate(candidate);
   });
 };
 
@@ -228,15 +220,13 @@ peer.addDataChannelsReadyCallback(function (dataChannels) {
 });
 
 ws.onopen = function() {
-  peer.sendPendingIceCandidates(function (candidate) {
-    ws.send(JSON.stringify(candidate));
-  });
+  peer.sendPendingIceCandidates();
 
   peer.addSendOfferHandler(function (offer) {
     ws.send(JSON.stringify(offer));
   });
 
-  peer.init();
+  peer.createOffer();
 };
 
 ws.onmessage = function(event) {
