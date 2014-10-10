@@ -1,9 +1,11 @@
-function WebRTCBridge (namespace) {
+var wrtc = require('wrtc');
+
+function WebRTCBridge () {
   this.pendingDataChannels = {};
   this.dataChannels = {}
   this.pendingIceCandidates = [];
   this.pc = null;
-  this.remoteReceived = false;
+  this.answerCreated = false;
 
   this.answerCreatedHandlers = [];
   this.localIceCandidateHandlers = [];
@@ -11,15 +13,9 @@ function WebRTCBridge (namespace) {
 
   this.channelMessageHandlers = {};
 
-  if (typeof namespace == "undefined") {
-    this.RTCPeerConnection = RTCPeerConnection;
-    this.RTCSessionDescription = RTCSessionDescription;
-    this.RTCIceCandidate = RTCIceCandidate;
-  } else {
-    this.RTCPeerConnection = namespace.RTCPeerConnection;
-    this.RTCSessionDescription = namespace.RTCSessionDescription;
-    this.RTCIceCandidate = namespace.RTCIceCandidate;
-  }
+  this.RTCPeerConnection = wrtc.RTCPeerConnection;
+  this.RTCSessionDescription = wrtc.RTCSessionDescription;
+  this.RTCIceCandidate = wrtc.RTCIceCandidate;
 
   this.dataChannelSettings = {
     'reliable': {
@@ -31,7 +27,7 @@ function WebRTCBridge (namespace) {
 
 WebRTCBridge.prototype.recvOffer = function (data) {
   var offer = new this.RTCSessionDescription(data);
-  this.remoteReceived = false;
+  this.answerCreated = false;
 
   this.pc = new this.RTCPeerConnection(
     {
@@ -124,7 +120,7 @@ WebRTCBridge.prototype._doSetRemoteDesc = function (offer) {
 };
 
 WebRTCBridge.prototype._doCreateAnswer = function () {
-  this.remoteReceived = true;
+  this.answerCreated = true;
   var peer = this;
   this.pendingIceCandidates.forEach(function(candidate) {
     peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
@@ -156,7 +152,7 @@ WebRTCBridge.prototype._doSendAnswer = function (answer) {
 };
 
 WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
-  if (this.remoteReceived) {
+  if (this.answerCreated) {
     this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
   } else {
     this.pendingIceCandidates.push(data);
@@ -211,7 +207,6 @@ WebRTCBridge.prototype.addAnswerCreatedHandler = function (handler) {
 
 var static = require('node-static-alias');
 var http = require('http');
-var webrtc = require('wrtc');
 var ws = require('ws');
 
 var args = require('minimist')(process.argv.slice(2));
@@ -240,7 +235,7 @@ var wss = new ws.Server({'port': socketPort});
 wss.on('connection', function(ws) {
   console.info('~~~~~ ws connected ~~~~~~');
 
-  var peer = new WebRTCBridge(webrtc);
+  var peer = new WebRTCBridge();
 
   peer.addLocalIceCandidateHandler(function (iceCandidate) {
     ws.send(JSON.stringify(iceCandidate));
