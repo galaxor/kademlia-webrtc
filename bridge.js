@@ -29,6 +29,16 @@ function WebRTCBridge () {
   // send them, start queueing them.
   this.outboundIceCandidates = [];
 
+  // We can only transfer ice candidates if the external channel is open.  This
+  // is not something that's within the scope of webrtc.  Therefore, we defer
+  // to the application to tell us when we're ready to transfer ICE candidates.
+  // They are allowed to register callbacks.  Whenever we get an ICE candidate,
+  // we will check to see if the comm channel is ready.  If not, we add the ICE
+  // candidate to the outbound queue.
+  // Also, we expect the application to call sendPendingIceCandidates when the
+  // comm channel opens.
+  this.iceXferReadyCallbacks = [];
+
   this.answerCreatedHandlers = [];
   this.localIceCandidateHandlers = [];
   this.dataChannelHandlers = [];
@@ -46,6 +56,34 @@ function WebRTCBridge () {
     },
   };
 }
+
+WebRTCBridge.prototype._iceXferReady = function () {
+  var ready = null;
+  this.iceXferReadyCallbacks.every(function (cb) {
+    ready = cb();
+    return ready;
+  });
+  return ready;
+};
+
+/**
+ * The application should call this when the external comm channel opens.  This
+ * will send all the outbound ICE candidates we've been queueing up.
+ */
+WebRTCBridge.prototype.sendPendingIceCandidates = function () {
+  var peer = this;
+  this.pendingIceCandidates.forEach(function(candidate) {
+    peer._xferIceCandidate(candidate);
+  });
+};
+
+/**
+ * Let the application register callbacks to tell us if the external comm
+ * channel is open and ready to send ICE candidates.
+ */
+WebRTCBridge.prototype.addIceXferReadyCallback = function (cb) {
+  this.iceXferReadyCallbacks.push(cb);
+};
 
 WebRTCBridge.prototype.recvOffer = function (data) {
   var offer = new this.RTCSessionDescription(data);
@@ -86,7 +124,16 @@ WebRTCBridge.prototype.recvOffer = function (data) {
     } else {
       candidate = event.candidate;
     }
-    peer._xferIceCandidate(candidate);
+
+    // Apparently, having a null candidate is something that can happen sometimes.
+    // Don't put the burden on the remote side to ignore that garbage.
+    if(!candidate) return;
+
+    if (peer._iceXferReady()) {
+      peer._xferIceCandidate(candidate);
+    } else {
+      peer.outboundIceCandidates.push(candidate);
+    }
   }
 
   this._doCreateDataChannelCallback(offer);
@@ -280,6 +327,17 @@ wss.on('connection', function(ws) {
 
   peer.addAnswerCreatedHandler(function (answer) {
     ws.send(JSON.stringify(answer));
+  });
+
+  // We don't need to call peer.sendPendingIceCandidates because we can't get
+  // to this point in the code without the comm channel being open.  Therefore,
+  // we don't start generating ICE candidates until after the channel is open.
+  // We will never have to queue any up to send.  Everything will get sent
+  // right away.
+
+  // Therefore, we can just return TRUE when asked if we're ready to send.
+  peer.addIceXferReadyCallback(function (cb) {
+    return true;
   });
 
   peer.addDataChannelHandler(function (channel) {
