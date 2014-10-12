@@ -137,6 +137,7 @@ WebRTCBridge.prototype.recvOffer = function (data) {
   }
 
   this._doCreateDataChannelCallback(offer);
+  this._doSetRemoteDesc(offer);
 };
 
 WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
@@ -188,8 +189,6 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
 
     channel.onerror = peer._doHandleError.bind(peer);
   };
-
-  this._doSetRemoteDesc(offer);
 };
 
 WebRTCBridge.prototype._doSetRemoteDesc = function (offer) {

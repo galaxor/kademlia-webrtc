@@ -94,6 +94,7 @@ WebRTCPeer.prototype.createOffer = function () {
   };
 
   this._doCreateDataChannels();
+  this._doCreateOffer();
 };
 
 WebRTCPeer.prototype._doCreateDataChannels = function () {
@@ -125,7 +126,6 @@ WebRTCPeer.prototype._doCreateDataChannels = function () {
     };
     channel.onerror = peer._doHandleError.bind(peer);
   });
-  this._doCreateOffer();
 };
 
 WebRTCPeer.prototype._doCreateOffer = function () {
