@@ -3,9 +3,31 @@ var wrtc = require('wrtc');
 function WebRTCBridge () {
   this.pendingDataChannels = {};
   this.dataChannels = {}
-  this.pendingIceCandidates = [];
   this.pc = null;
-  this.answerCreated = false;
+
+  // ICE Candidate queues.
+  // We can't accept inbound ICE candidates until we've setRemoteDescription.
+  // We can't send outbound ICE candidates until our external, non-webrtc
+  // communication channel is open, whatever that may be.
+
+  // Inbound:  They may start sending us ICE candidates before we're ready.
+  // We're ready once we've setLocalDescription or setRemoteDescription.
+  // Before that happens, queue the ICE candidates.
+  this.inboundIceCandidates = [];
+
+  // This variable keeps track of whether we've set the local desc or remote
+  // desc.  If it is false, we must continue queueing inbound ICE candidates.
+  // If it is true, we can start adding them to the peerConnection right away.
+  // Also, once we've set the local or remote description, we will add all the
+  // ICE candidates in the queue.
+  this.localOrRemoteDescSet = false;
+
+  // Outbound:  We may start generating ICE candidates before we're ready to send them.
+  // For example, if we are the one to send the offer, we may
+  // setLocalDescription before our external comm channel is open (possibly
+  // websocket).  If we start generating ICE candidates before we're ready to
+  // send them, start queueing them.
+  this.outboundIceCandidates = [];
 
   this.answerCreatedHandlers = [];
   this.localIceCandidateHandlers = [];
@@ -27,7 +49,7 @@ function WebRTCBridge () {
 
 WebRTCBridge.prototype.recvOffer = function (data) {
   var offer = new this.RTCSessionDescription(data);
-  this.answerCreated = false;
+  this.localOrRemoteDescSet = false;
 
   this.pc = new this.RTCPeerConnection(
     {
@@ -49,7 +71,21 @@ WebRTCBridge.prototype.recvOffer = function (data) {
   };
 
   var peer = this;
-  this.pc.onicecandidate = function(candidate) {
+  this.pc.onicecandidate = function(event) {
+    var candidate;
+
+    // In some webrtc implementations (firefox, chromium), the argument will be
+    // an "event", which will have a key "candidate", which is the ICE
+    // candidate.  In others (nodejs), the argument will be just the ICE
+    // candidate object itself.
+    // But we can't use the presence of a "candidate" key as the test of
+    // eventhood, because the ICE candidate object itself also has a key called
+    // "candidate".
+    if (typeof event.target == "undefined") {
+      candidate = event;
+    } else {
+      candidate = event.candidate;
+    }
     peer._xferIceCandidate(candidate);
   }
 
@@ -120,11 +156,12 @@ WebRTCBridge.prototype._doSetRemoteDesc = function (offer) {
 };
 
 WebRTCBridge.prototype._doCreateAnswer = function () {
-  this.answerCreated = true;
+  this.localOrRemoteDescSet = true;
   var peer = this;
-  this.pendingIceCandidates.forEach(function(candidate) {
+  this.inboundIceCandidates.forEach(function(candidate) {
     peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
   });
+  this.inboundIceCandidates = [];
   this.pc.createAnswer(
     peer._doSetLocalDesc.bind(peer),
     peer._doHandleError.bind(peer)
@@ -152,10 +189,10 @@ WebRTCBridge.prototype._doSendAnswer = function (answer) {
 };
 
 WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
-  if (this.answerCreated) {
+  if (this.localOrRemoteDescSet) {
     this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
   } else {
-    this.pendingIceCandidates.push(data);
+    this.inboundIceCandidates.push(data);
   }
 };
 
