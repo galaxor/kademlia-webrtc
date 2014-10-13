@@ -176,7 +176,7 @@ WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
   });
 };
 
-WebRTCPeer.prototype._doSetRemoteDesc = function (desc) {
+WebRTCPeer.prototype.recvAnswer = function (desc) {
   var peer = this;
   this.pc.setRemoteDescription(
     new peer.RTCSessionDescription(desc),
@@ -232,7 +232,7 @@ ws.onopen = function() {
 ws.onmessage = function(event) {
   var data = JSON.parse(event.data);
   if('answer' == data.type) {
-    peer._doSetRemoteDesc(data);
+    peer.recvAnswer(data);
   } else if('ice' == data.type) {
     console.log(data);
     peer.recvRemoteIceCandidate(data.sdp.candidate);

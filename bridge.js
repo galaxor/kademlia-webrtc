@@ -1,9 +1,31 @@
 var wrtc = require('wrtc');
 
 function WebRTCBridge () {
-  this.pendingDataChannels = {};
-  this.dataChannels = {}
+  // This is the WebRTCPeerconnection object.
   this.pc = null;
+
+  // - Data channel things -
+
+  // This defines what data channels we expect to exist.
+  // Currently, this is hard-coded to expect one channel named 'reliable'.
+  // This does not do anything except set the number of data channels we expect to exist.
+  // When that number of data channels have been opened, we fire our "complete"
+  // callback, which currently doesn't do anything.
+  this.dataChannelSettings = {
+    'reliable': {
+      ordered: false,
+      maxRetransmits: 0
+    },
+  };
+
+  // This collects the datachannel objects after they are created but before they are open.
+  this.pendingDataChannels = {};
+
+  // This collects the datachannel objects after they are open.
+  this.dataChannels = {};
+
+
+  // - ICE candidate things - 
 
   // ICE Candidate queues.
   // We can't accept inbound ICE candidates until we've setRemoteDescription.
@@ -39,22 +61,38 @@ function WebRTCBridge () {
   // comm channel opens.
   this.iceXferReadyCallbacks = [];
 
-  this.answerCreatedHandlers = [];
-  this.localIceCandidateHandlers = [];
+
+  // - Event handler queues -
+  // The application can register handlers for certain events.  They are
+  // collected in these queues.
+
+  // These are fired when we create the WebRTC answer.  The application can
+  // register handlers that should probably do something to send the answer we
+  // created back to the other WebRTC peer, so we can establish communication.
+  this.sendAnswerHandlers = [];
+
+  // These are fired when we are ready to send an ICE candidate to the other WebRTC peer.
+  // The application does not need to worry about such things ans outbound ICE
+  // candidate queues.  These handlers are called only when we are actually
+  // ready to send the local ICE candidates.
+  this.sendLocalIceCandidateHandlers = [];
+
+  // These are fired when a data channel is opened.  An application can use
+  // this to initiate communication or prepare to receive communication.
   this.dataChannelHandlers = [];
 
+  // These are called when a message is received on a channel.  The handlers
+  // for the appropriate dataChannel are called.
   this.channelMessageHandlers = {};
 
+  // - Bring the standard WebRTC components into our namespace -
+  // At the time of writing, both firefox and chromium keep their WebRTC
+  // functions prefixed.  Furthermore, the nodejs wrtc functions are always in
+  // the module's namespace.  No matter where they are, let's make them
+  // functions belonging to this class, so we know where to find them.
   this.RTCPeerConnection = wrtc.RTCPeerConnection;
   this.RTCSessionDescription = wrtc.RTCSessionDescription;
   this.RTCIceCandidate = wrtc.RTCIceCandidate;
-
-  this.dataChannelSettings = {
-    'reliable': {
-      ordered: false,
-      maxRetransmits: 0
-    },
-  };
 }
 
 WebRTCBridge.prototype._iceXferReady = function () {
@@ -137,7 +175,12 @@ WebRTCBridge.prototype.recvOffer = function (data) {
   }
 
   this._doCreateDataChannelCallback(offer);
-  this._doSetRemoteDesc(offer);
+
+  this.pc.setRemoteDescription(
+    offer,
+    peer._doCreateAnswer.bind(peer),
+    peer._doHandleError.bind(peer)
+  );
 };
 
 WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
@@ -191,16 +234,6 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
   };
 };
 
-WebRTCBridge.prototype._doSetRemoteDesc = function (offer) {
-  console.info(offer);
-  var peer = this;
-  this.pc.setRemoteDescription(
-    offer,
-    peer._doCreateAnswer.bind(peer),
-    peer._doHandleError.bind(peer)
-  );
-};
-
 WebRTCBridge.prototype._doCreateAnswer = function () {
   this.localOrRemoteDescSet = true;
   var peer = this;
@@ -228,7 +261,7 @@ WebRTCBridge.prototype._doSetLocalDesc = function (desc) {
 WebRTCBridge.prototype._doSendAnswer = function (answer) {
   console.log("Sending answer:", answer);
   var peer = this;
-  this.answerCreatedHandlers.forEach(function(handler) {
+  this.sendAnswerHandlers.forEach(function(handler) {
     handler(answer);
   });
   console.log("Awaiting data channels");
@@ -242,8 +275,8 @@ WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
   }
 };
 
-WebRTCBridge.prototype.addLocalIceCandidateHandler = function (handler) {
-  this.localIceCandidateHandlers.push(handler);
+WebRTCBridge.prototype.addSendLocalIceCandidateHandler = function (handler) {
+  this.sendLocalIceCandidateHandlers.push(handler);
 };
 
 WebRTCBridge.prototype._xferIceCandidate = function (candidate) {
@@ -258,7 +291,7 @@ WebRTCBridge.prototype._xferIceCandidate = function (candidate) {
 
   console.info(JSON.stringify(iceCandidate));
 
-  this.localIceCandidateHandlers.forEach(function (handler) {
+  this.sendLocalIceCandidateHandlers.forEach(function (handler) {
     handler(iceCandidate);
   });
 };
@@ -283,8 +316,8 @@ WebRTCBridge.prototype.addChannelMessageHandler = function (channel, handler) {
   this.channelMessageHandlers[channel.label].push(handler);
 };
 
-WebRTCBridge.prototype.addAnswerCreatedHandler = function (handler) {
-  this.answerCreatedHandlers.push(handler);
+WebRTCBridge.prototype.addSendAnswerHandler = function (handler) {
+  this.sendAnswerHandlers.push(handler);
 };
 
 
@@ -320,11 +353,11 @@ wss.on('connection', function(ws) {
 
   var peer = new WebRTCBridge();
 
-  peer.addLocalIceCandidateHandler(function (iceCandidate) {
+  peer.addSendLocalIceCandidateHandler(function (iceCandidate) {
     ws.send(JSON.stringify(iceCandidate));
   });
 
-  peer.addAnswerCreatedHandler(function (answer) {
+  peer.addSendAnswerHandler(function (answer) {
     ws.send(JSON.stringify(answer));
   });
 
