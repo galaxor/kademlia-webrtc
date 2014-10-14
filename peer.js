@@ -10,6 +10,8 @@ function WebRTCPeer () {
   this.RTCSessionDescription = wrtc.RTCSessionDescription;
   this.RTCIceCandidate = wrtc.RTCIceCandidate;
 
+  this.localOrRemoteDescSet = false;
+
   this.dataChannelSettings = {
     'reliable': {
           outOfOrderAllowed: false,
@@ -21,8 +23,11 @@ function WebRTCPeer () {
   this.localIceCandidateHandlers = [];
   this.sendOfferHandlers = [];
   this.dataChannelsOpenCallbacks = [];
+
+  this.inboundIceCandidates = [];
 }
 
+// in bridge.js
 WebRTCPeer.prototype._iceXferReady = function () {
   var ready = null;
   this.iceXferReadyCallbacks.every(function (cb) {
@@ -36,6 +41,7 @@ WebRTCPeer.prototype.addLocalIceCandidateHandler = function (handler) {
   this.localIceCandidateHandlers.push(handler);
 };
 
+// in bridge.js
 WebRTCPeer.prototype.addIceXferReadyCallback = function (cb) {
   this.iceXferReadyCallbacks.push(cb);
 };
@@ -131,23 +137,22 @@ WebRTCPeer.prototype._doCreateDataChannels = function () {
 WebRTCPeer.prototype._doCreateOffer = function () {
   var peer = this;
   this.pc.createOffer(
-    this._doSetLocalDesc.bind(peer),
+    function (offer) {
+      peer.pc.setLocalDescription(
+        new peer.RTCSessionDescription(offer),
+        peer._doSendOffer.bind(peer, offer),
+        peer._doHandleError.bind(peer)
+      );
+    },
     this._doHandleError.bind(peer)
   );
-}
-
-WebRTCPeer.prototype._doSetLocalDesc = function (desc) {
-  var peer = this;
-  this.pc.setLocalDescription(
-    new this.RTCSessionDescription(desc),
-    this._doSendOffer.bind(peer, desc),
-    this._doHandleError.bind(peer)
-  );
-}
+};
 
 WebRTCPeer.prototype._doSendOffer = function (offer) {
-  var peer = this;
-  console.log("Sending offer: ", offer);
+  this.localOrRemoteDescSet = true;
+  this.inboundIceCandidates.forEach(function(candidate) {
+    peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
+  });
 
   var offerObj = {
     'type': offer.type,
@@ -158,6 +163,7 @@ WebRTCPeer.prototype._doSendOffer = function (offer) {
     handler(offerObj);
   });
 };
+
 
 WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
   var iceCandidate = {
@@ -185,6 +191,7 @@ WebRTCPeer.prototype.recvAnswer = function (desc) {
   );
 };
 
+// in bridge.js
 WebRTCPeer.prototype.sendPendingIceCandidates = function () {
   var peer = this;
   this.pendingIceCandidates.forEach(function(candidate) {
@@ -195,6 +202,12 @@ WebRTCPeer.prototype.sendPendingIceCandidates = function () {
 WebRTCPeer.prototype.recvRemoteIceCandidate = function (candidate) {
   var candidateObj = new this.RTCIceCandidate(candidate);
   this.pc.addIceCandidate(candidateObj);
+
+//   if (this.localOrRemoteDescSet) {
+//     this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
+//   } else {
+//     this.inboundIceCandidates.push(data);
+//   }
 };
 
 (function() {

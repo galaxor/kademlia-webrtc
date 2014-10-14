@@ -7,10 +7,22 @@ function WebRTCBridge () {
   // - Data channel things -
 
   // This defines what data channels we expect to exist.
-  // Currently, this is hard-coded to expect one channel named 'reliable'.
-  // This does not do anything except set the number of data channels we expect to exist.
+  // Data channels are created by the peer that's creating the offer.
+  // The side that receives the offer just opens the offered channels.
+  // Therefore, these settings only have meaning for the side that's creating
+  // the offer.
+  // However, the side that's receiving the offer uses this list to know what
+  // channels to expect.  We should probably leave this type of thing up to the
+  // application, but instead, it is currently hard-coded to create (if
+  // offering) or expect (if receiving) one data channel named 'reliable'.
+  // "Expecting" this channel (on the receiving end) does not do anything
+  // except set the number of data channels we expect to exist.
   // When that number of data channels have been opened, we fire our "complete"
   // callback, which currently doesn't do anything.
+  // Note:  This business of the offering side being the only one that creates
+  // data channels?  This is a quirk of this WebRTCBridge class, and is not
+  // inherent to the WebRTC API.  A more flexible system could be created, that
+  // would give the application more control over its data channels.
   this.dataChannelSettings = {
     'reliable': {
       ordered: false,
@@ -235,36 +247,31 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
 };
 
 WebRTCBridge.prototype._doCreateAnswer = function () {
-  this.localOrRemoteDescSet = true;
   var peer = this;
+
+  this.localOrRemoteDescSet = true;
   this.inboundIceCandidates.forEach(function(candidate) {
     peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
   });
+
   this.inboundIceCandidates = [];
   this.pc.createAnswer(
-    peer._doSetLocalDesc.bind(peer),
-    peer._doHandleError.bind(peer)
-  );
-};
-
-WebRTCBridge.prototype._doSetLocalDesc = function (desc) {
-  var answer = desc;
-  console.info("DESC:: ", desc);
-  var peer = this;
-  this.pc.setLocalDescription(
-    desc,
-    peer._doSendAnswer.bind(peer, answer),
+    function (answer) {
+      peer.pc.setLocalDescription(
+        answer,
+        peer._doSendAnswer.bind(peer, answer),
+        peer._doHandleError.bind(peer)
+      );
+    },
     peer._doHandleError.bind(peer)
   );
 };
 
 WebRTCBridge.prototype._doSendAnswer = function (answer) {
-  console.log("Sending answer:", answer);
   var peer = this;
   this.sendAnswerHandlers.forEach(function(handler) {
     handler(answer);
   });
-  console.log("Awaiting data channels");
 };
 
 WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
