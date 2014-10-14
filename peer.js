@@ -199,15 +199,12 @@ WebRTCPeer.prototype.sendPendingIceCandidates = function () {
   });
 };
 
-WebRTCPeer.prototype.recvRemoteIceCandidate = function (candidate) {
-  var candidateObj = new this.RTCIceCandidate(candidate);
-  this.pc.addIceCandidate(candidateObj);
-
-//   if (this.localOrRemoteDescSet) {
-//     this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
-//   } else {
-//     this.inboundIceCandidates.push(data);
-//   }
+WebRTCPeer.prototype.recvRemoteIceCandidate = function (data) {
+  if (this.localOrRemoteDescSet) {
+    this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
+  } else {
+    this.inboundIceCandidates.push(data);
+  }
 };
 
 (function() {
@@ -248,7 +245,7 @@ ws.onmessage = function(event) {
     peer.recvAnswer(data);
   } else if('ice' == data.type) {
     console.log(data);
-    peer.recvRemoteIceCandidate(data.sdp.candidate);
+    peer.recvRemoteIceCandidate(data);
   }
 };
 
