@@ -20,7 +20,7 @@ function WebRTCPeer () {
   };
 
   this.iceXferReadyCallbacks = [];
-  this.localIceCandidateHandlers = [];
+  this.sendLocalIceCandidateHandlers = [];
   this.sendOfferHandlers = [];
   this.dataChannelsOpenCallbacks = [];
 
@@ -37,8 +37,9 @@ WebRTCPeer.prototype._iceXferReady = function () {
   return ready;
 };
 
-WebRTCPeer.prototype.addLocalIceCandidateHandler = function (handler) {
-  this.localIceCandidateHandlers.push(handler);
+// in bridge.js
+WebRTCPeer.prototype.addSendLocalIceCandidateHandler = function (handler) {
+  this.sendLocalIceCandidateHandlers.push(handler);
 };
 
 // in bridge.js
@@ -177,7 +178,7 @@ WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
 
   console.info(JSON.stringify(iceCandidate));
 
-  this.localIceCandidateHandlers.forEach(function (handler) {
+  this.sendLocalIceCandidateHandlers.forEach(function (handler) {
     handler(iceCandidate);
   });
 };
@@ -199,6 +200,7 @@ WebRTCPeer.prototype.sendPendingIceCandidates = function () {
   });
 };
 
+// in bridge.js
 WebRTCPeer.prototype.recvRemoteIceCandidate = function (data) {
   if (this.localOrRemoteDescSet) {
     this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
@@ -217,7 +219,7 @@ ws = new WebSocket("ws://" + bridge);
 
 var peer = new WebRTCPeer(wrtc);
 
-peer.addLocalIceCandidateHandler(function (candidate) {
+peer.addSendLocalIceCandidateHandler(function (candidate) {
   ws.send(JSON.stringify(candidate));
 });
 peer.addIceXferReadyCallback(function (cb) {
