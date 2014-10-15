@@ -23,12 +23,15 @@ function WebRTCBridge () {
   // data channels?  This is a quirk of this WebRTCBridge class, and is not
   // inherent to the WebRTC API.  A more flexible system could be created, that
   // would give the application more control over its data channels.
-  this.dataChannelSettings = {
-    'reliable': {
-      ordered: false,
-      maxRetransmits: 0
-    },
-  };
+
+  // This defines what data channels we expect the remote side to open.
+  // If it's empty, we will allow the remote side to open any data channels.
+  // But if there are expected data channels set (by addExpectedDataChannels),
+  // and the remote side tries to open one with a different name, we will
+  // reject it.
+  // Also, if we set expectedDataChannels, then we can fire callbacks (from
+  // dataChannelsOpenCallbacks) when all of them are open.
+  this.expectedDataChannels = {};
 
   // This collects the datachannel objects after they are created but before they are open.
   this.pendingDataChannels = {};
@@ -137,6 +140,11 @@ WebRTCBridge.prototype.addIceXferReadyCallback = function (cb) {
   this.iceXferReadyCallbacks.push(cb);
 };
 
+WebRTCBridge.prototype.addExpectedDataChannels = function (label) {
+  // XXX look up how to do variable arguments.
+  this.expectedDataChannels[label] = true;
+};
+
 WebRTCBridge.prototype.recvOffer = function (data) {
   var offer = new this.RTCSessionDescription(data);
   this.localOrRemoteDescSet = false;
@@ -198,7 +206,7 @@ WebRTCBridge.prototype.recvOffer = function (data) {
 };
 
 WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
-  var labels = Object.keys(this.dataChannelSettings);
+  var labels = Object.keys(this.expectedDataChannels);
 
   console.log("Handling data channels");
 
@@ -209,13 +217,20 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
 
     console.log('ondatachannel', channel.label, channel.readyState);
     var label = channel.label;
+
+    // Reject the dataChannel if we were not expecting it.
+    if (labels.length > 0 && typeof peer.expectedDataChannels[label] == "undefined") {
+      console.log("Unexpected data channel rejected (" + label + ").  I should probably have callbacks for this.");
+      return;
+    }
+
     peer.pendingDataChannels[label] = channel;
     channel.binaryType = 'arraybuffer';
     channel.onopen = function() {
       console.info('onopen');
       peer.dataChannels[label] = channel;
       delete peer.pendingDataChannels[label];
-      if(Object.keys(peer.dataChannels).length === labels.length) {
+      if (labels.length > 0 && Object.keys(peer.dataChannels).length === labels.length) {
         peer._doAllDataChannelsOpen();
       }
 
@@ -369,6 +384,8 @@ wss.on('connection', function(ws) {
   console.info('~~~~~ ws connected ~~~~~~');
 
   var peer = new WebRTCBridge();
+
+  peer.addExpectedDataChannels('reliable');
 
   peer.addSendLocalIceCandidateHandler(function (iceCandidate) {
     ws.send(JSON.stringify(iceCandidate));
