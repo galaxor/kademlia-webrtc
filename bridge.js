@@ -97,6 +97,8 @@ function WebRTCBridge () {
   // for the appropriate dataChannel are called.
   this.channelMessageHandlers = {};
 
+  this.dataChannelsOpenCallbacks = [];
+
   // - Bring the standard WebRTC components into our namespace -
   // At the time of writing, both firefox and chromium keep their WebRTC
   // functions prefixed.  Furthermore, the nodejs wrtc functions are always in
@@ -304,7 +306,11 @@ WebRTCBridge.prototype._xferIceCandidate = function (candidate) {
 };
 
 WebRTCBridge.prototype._doAllDataChannelsOpen = function () {
-  console.info('complete');
+  var peer = this;
+  console.log('complete');
+  this.dataChannelsOpenCallbacks.forEach(function (cb) {
+    cb(peer.dataChannels);
+  });
 };
 
 WebRTCBridge.prototype._doHandleError = function (error) {
@@ -313,6 +319,10 @@ WebRTCBridge.prototype._doHandleError = function (error) {
 
 WebRTCBridge.prototype.addDataChannelHandler = function (handler) {
   this.dataChannelHandlers.push(handler);
+};
+
+WebRTCBridge.prototype.addDataChannelsOpenCallback = function (cb) {
+  this.dataChannelsOpenCallbacks.push(cb);
 };
 
 

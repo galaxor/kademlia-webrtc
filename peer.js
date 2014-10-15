@@ -51,7 +51,8 @@ WebRTCPeer.prototype.addSendOfferHandler = function (handler) {
   this.sendOfferHandlers.push(handler);
 };
 
-WebRTCPeer.prototype.addDataChannelsReadyCallback = function (cb) {
+// in bridge.js
+WebRTCPeer.prototype.addDataChannelsOpenCallback = function (cb) {
   this.dataChannelsOpenCallbacks.push(cb);
 };
 
@@ -166,6 +167,7 @@ WebRTCPeer.prototype._doSendOffer = function (offer) {
 };
 
 
+// in bridge.js
 WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
   var iceCandidate = {
     'type': 'ice',
@@ -225,7 +227,7 @@ peer.addSendLocalIceCandidateHandler(function (candidate) {
 peer.addIceXferReadyCallback(function (cb) {
   return WebSocket.OPEN == ws.readyState;
 });
-peer.addDataChannelsReadyCallback(function (dataChannels) {
+peer.addDataChannelsOpenCallback(function (dataChannels) {
   var data = new Uint8Array([97, 99, 107, 0]);
   dataChannels['reliable'].send(data.buffer);
   dataChannels['reliable'].send("Hello bridge!");
