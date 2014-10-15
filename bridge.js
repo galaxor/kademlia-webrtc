@@ -32,6 +32,7 @@ function WebRTCBridge () {
   // Also, if we set expectedDataChannels, then we can fire callbacks (from
   // dataChannelsOpenCallbacks) when all of them are open.
   this.expectedDataChannels = {};
+  this.unexpectedDataChannelCallbacks = [];
 
   // This collects the datachannel objects after they are created but before they are open.
   this.pendingDataChannels = {};
@@ -140,9 +141,20 @@ WebRTCBridge.prototype.addIceXferReadyCallback = function (cb) {
   this.iceXferReadyCallbacks.push(cb);
 };
 
+/**
+ * Let the application set which data channel labels to expect.
+ * If there are no expectations, any data channel that opens is okay.
+ * If there are expected data channels, and an unexpected data channel opens,
+ * it will not have any callbacks on it, and the application may register a
+ * callback for the situation of rejecting a data channel.
+ */
 WebRTCBridge.prototype.addExpectedDataChannels = function (label) {
   // XXX look up how to do variable arguments.
   this.expectedDataChannels[label] = true;
+};
+
+WebRTCBridge.prototype.addUnexpectedDataChannelCallback = function (cb) {
+  this.unexpectedDataChannelCallbacks.push(cb);
 };
 
 WebRTCBridge.prototype.recvOffer = function (data) {
@@ -220,7 +232,9 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
 
     // Reject the dataChannel if we were not expecting it.
     if (labels.length > 0 && typeof peer.expectedDataChannels[label] == "undefined") {
-      console.log("Unexpected data channel rejected (" + label + ").  I should probably have callbacks for this.");
+      peer.unexpectedDataChannelCallbacks.forEach(function (cb) {
+        cb(channel);
+      });
       return;
     }
 
@@ -386,6 +400,9 @@ wss.on('connection', function(ws) {
   var peer = new WebRTCBridge();
 
   peer.addExpectedDataChannels('reliable');
+  peer.addUnexpectedDataChannelCallback(function (channel) {
+    console.log("Unexpected data channel rejected (" + channel.label + ").");
+  });
 
   peer.addSendLocalIceCandidateHandler(function (iceCandidate) {
     ws.send(JSON.stringify(iceCandidate));
