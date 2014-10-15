@@ -110,30 +110,36 @@ WebRTCPeer.prototype._doCreateDataChannels = function () {
   var labels = Object.keys(this.dataChannelSettings);
   labels.forEach(function(label) {
     var channelOptions = peer.dataChannelSettings[label];
-    var channel = peer.pendingDataChannels[label] = peer.pc.createDataChannel(label, channelOptions);
-    console.log(channel);
-    channel.binaryType = 'arraybuffer';
-    channel.onopen = function() {
-      console.info('onopen', label);
-      peer.dataChannels[label] = channel;
-      delete peer.pendingDataChannels[label];
-      if(Object.keys(peer.dataChannels).length === labels.length) {
-        peer._doAllDataChannelsOpen();
-      }
-    };
-    channel.onmessage = function(event) {
-      var data = event.data;
-      if('string' == typeof data) {
-        console.log('onmessage:', data);
-      } else {
-        console.log('onmessage:', new Uint8Array(data));
-      }
-    };
-    channel.onclose = function(event) {
-      console.info('onclose');
-    };
-    channel.onerror = peer._doHandleError.bind(peer);
+    peer.createDataChannel(label, channelOptions);
   });
+};
+
+WebRTCPeer.prototype.createDataChannel = function (label, channelOptions) {
+  var peer = this;
+  var channel = peer.pendingDataChannels[label] = peer.pc.createDataChannel(label, channelOptions);
+  var labels = Object.keys(this.dataChannelSettings);
+  console.log(channel);
+  channel.binaryType = 'arraybuffer';
+  channel.onopen = function() {
+    console.info('onopen', label);
+    peer.dataChannels[label] = channel;
+    delete peer.pendingDataChannels[label];
+    if(Object.keys(peer.dataChannels).length === labels.length) {
+      peer._doAllDataChannelsOpen();
+    }
+  };
+  channel.onmessage = function(event) {
+    var data = event.data;
+    if('string' == typeof data) {
+      console.log('onmessage:', data);
+    } else {
+      console.log('onmessage:', new Uint8Array(data));
+    }
+  };
+  channel.onclose = function(event) {
+    console.info('onclose');
+  };
+  channel.onerror = peer._doHandleError.bind(peer);
 };
 
 WebRTCPeer.prototype._doCreateOffer = function () {
