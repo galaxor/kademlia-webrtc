@@ -151,24 +151,26 @@ WebRTCBridge.prototype.addIceXferReadyCallback = function (cb) {
  * If there are expected data channels, and an unexpected data channel opens,
  * it will not have any callbacks on it, and the application may register a
  * callback for the situation of rejecting a data channel.
+ * There are two forms for calling this:
+ *  addExpectedDataChannels(['label1', 'label2'])
+ *  addExpectedDataChannels({label1: callback, label2: callback})
  */
 WebRTCBridge.prototype.addExpectedDataChannels = function () {
   var label;
   var callback = null;
 
-  for (var i=0; i<arguments.length; i++) {
-    var arg = arguments[i];
-    if (typeof arg == "string") {
-      label = arg;
+  if (typeof arguments[0] == "object") {
+    var arg = arguments[0];
+    for (var i in arg) {
+      label = i;
+      callback = arg[i];
       this.expectedDataChannels[label] = true;
-    } else {
-      for (var j in arg) {
-        label = j;
-        callback = arg[j];
-        console.log("LBL", label, "CB", callback);
-        this.expectedDataChannels[label] = true;
-        this.addChannelMessageHandler(label, callback);
-      }
+      this.addChannelMessageHandler(label, callback);
+    }
+  } else {
+    for (var i=0; i<arguments.length; i++) {
+      label = arguments[i];
+      this.expectedDataChannels[label] = true;
     }
   }
 };
@@ -430,7 +432,6 @@ wss.on('connection', function(ws) {
     }
   });
 
-  // peer.addExpectedDataChannels('reliable');
   peer.addUnexpectedDataChannelCallback(function (channel) {
     console.log("Unexpected data channel rejected (" + channel.label + ").");
   });
@@ -453,19 +454,6 @@ wss.on('connection', function(ws) {
   peer.addIceXferReadyCallback(function (cb) {
     return true;
   });
-
-/*
-  peer.addDataChannelHandler(function (channel) {
-    peer.addChannelMessageHandler(channel.label, function (channel, data) {
-      if('string' == typeof data) {
-        channel.send("Hello peer!");
-      } else {
-        var response = new Uint8Array([107, 99, 97, 0]);
-        channel.send(response.buffer);
-      }
-    });
-  });
-*/
 
   ws.on('message', function(data) {
     data = JSON.parse(data);
