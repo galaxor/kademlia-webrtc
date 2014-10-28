@@ -1,6 +1,6 @@
 var wrtc = require('wrtc');
 
-function WebRTCBridge () {
+function WebRTCBridge (args) {
   // This is the WebRTCPeerconnection object.
   this.pc = null;
 
@@ -33,6 +33,14 @@ function WebRTCBridge () {
   // dataChannelsOpenCallbacks) when all of them are open.
   this.expectedDataChannels = {};
   this.unexpectedDataChannelCallbacks = [];
+
+  // These are called when a message is received on a channel.  The handlers
+  // for the appropriate dataChannel are called.
+  this.channelMessageHandlers = {};
+
+  if (typeof args != "undefined" && typeof args.expectedDataChannels != "undefined") {
+    this.addExpectedDataChannels(args.expectedDataChannels);
+  }
 
   // This collects the datachannel objects after they are created but before they are open.
   this.pendingDataChannels = {};
@@ -97,10 +105,6 @@ function WebRTCBridge () {
   // this to initiate communication or prepare to receive communication.
   this.dataChannelHandlers = [];
 
-  // These are called when a message is received on a channel.  The handlers
-  // for the appropriate dataChannel are called.
-  this.channelMessageHandlers = {};
-
   this.dataChannelsOpenCallbacks = [];
 
   // - Bring the standard WebRTC components into our namespace -
@@ -148,9 +152,25 @@ WebRTCBridge.prototype.addIceXferReadyCallback = function (cb) {
  * it will not have any callbacks on it, and the application may register a
  * callback for the situation of rejecting a data channel.
  */
-WebRTCBridge.prototype.addExpectedDataChannels = function (label) {
-  // XXX look up how to do variable arguments.
-  this.expectedDataChannels[label] = true;
+WebRTCBridge.prototype.addExpectedDataChannels = function () {
+  var label;
+  var callback = null;
+
+  for (var i=0; i<arguments.length; i++) {
+    var arg = arguments[i];
+    if (typeof arg == "string") {
+      label = arg;
+      this.expectedDataChannels[label] = true;
+    } else {
+      for (var j in arg) {
+        label = j;
+        callback = arg[j];
+        console.log("LBL", label, "CB", callback);
+        this.expectedDataChannels[label] = true;
+        this.addChannelMessageHandler(label, callback);
+      }
+    }
+  }
 };
 
 WebRTCBridge.prototype.addUnexpectedDataChannelCallback = function (cb) {
@@ -355,11 +375,11 @@ WebRTCBridge.prototype.addDataChannelsOpenCallback = function (cb) {
 };
 
 
-WebRTCBridge.prototype.addChannelMessageHandler = function (channel, handler) {
-  if (typeof this.channelMessageHandlers[channel.label] == "undefined") {
-    this.channelMessageHandlers[channel.label] = [];
+WebRTCBridge.prototype.addChannelMessageHandler = function (label, handler) {
+  if (typeof this.channelMessageHandlers[label] == "undefined") {
+    this.channelMessageHandlers[label] = [];
   }
-  this.channelMessageHandlers[channel.label].push(handler);
+  this.channelMessageHandlers[label].push(handler);
 };
 
 WebRTCBridge.prototype.addSendAnswerHandler = function (handler) {
@@ -397,9 +417,20 @@ var wss = new ws.Server({'port': socketPort});
 wss.on('connection', function(ws) {
   console.info('~~~~~ ws connected ~~~~~~');
 
-  var peer = new WebRTCBridge();
+  var peer = new WebRTCBridge({
+    expectedDataChannels: {
+      'reliable': function (channel, data) {
+        if('string' == typeof data) {
+          channel.send("Hello peer!");
+        } else {
+          var response = new Uint8Array([107, 99, 97, 0]);
+          channel.send(response.buffer);
+        }
+      },
+    }
+  });
 
-  peer.addExpectedDataChannels('reliable');
+  // peer.addExpectedDataChannels('reliable');
   peer.addUnexpectedDataChannelCallback(function (channel) {
     console.log("Unexpected data channel rejected (" + channel.label + ").");
   });
@@ -423,8 +454,9 @@ wss.on('connection', function(ws) {
     return true;
   });
 
+/*
   peer.addDataChannelHandler(function (channel) {
-    peer.addChannelMessageHandler(channel, function (channel, data) {
+    peer.addChannelMessageHandler(channel.label, function (channel, data) {
       if('string' == typeof data) {
         channel.send("Hello peer!");
       } else {
@@ -433,6 +465,7 @@ wss.on('connection', function(ws) {
       }
     });
   });
+*/
 
   ws.on('message', function(data) {
     data = JSON.parse(data);
