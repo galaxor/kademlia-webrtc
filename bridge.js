@@ -239,6 +239,23 @@ WebRTCBridge.prototype.recvOffer = function (data) {
   );
 };
 
+WebRTCBridge.prototype._dataChannelOpen = function (channel) {
+  var peer = this;
+  var label = channel.label;
+  var labels = Object.keys(this.expectedDataChannels);
+
+  console.info('onopen');
+  peer.dataChannels[label] = channel;
+  delete peer.pendingDataChannels[label];
+  if (labels.length > 0 && Object.keys(peer.dataChannels).length === labels.length) {
+    peer._doAllDataChannelsOpen();
+  }
+
+  peer.dataChannelHandlers.forEach(function (handler) {
+    handler(channel);
+  });
+}
+
 WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
   var labels = Object.keys(this.expectedDataChannels);
 
@@ -262,18 +279,8 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
 
     peer.pendingDataChannels[label] = channel;
     channel.binaryType = 'arraybuffer';
-    channel.onopen = function() {
-      console.info('onopen');
-      peer.dataChannels[label] = channel;
-      delete peer.pendingDataChannels[label];
-      if (labels.length > 0 && Object.keys(peer.dataChannels).length === labels.length) {
-        peer._doAllDataChannelsOpen();
-      }
+    channel.onopen = peer._dataChannelOpen.bind(peer, channel);
 
-      peer.dataChannelHandlers.forEach(function (handler) {
-        handler(channel);
-      });
-    };
     if (channel.readyState == "open") {
       // Manully open the channel in case it was created in the open state.  If
       // that happens, we don't set the "onopen" until later, so it will never
@@ -430,6 +437,10 @@ wss.on('connection', function(ws) {
         }
       },
     }
+  });
+
+  peer.addDataChannelHandler(function (channel) {
+    console.log("Channel open btw:", channel.label);
   });
 
   peer.addUnexpectedDataChannelCallback(function (channel) {
