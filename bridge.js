@@ -46,6 +46,10 @@ function WebRTCBridge (args) {
     this.addExpectedDataChannels(args.expectedDataChannels);
   }
 
+  // This is the list of data channels we want to create.  We will create them
+  // once we've been asked to create the offer or answer.
+  this.dataChannelSettings = {};
+
   // This collects the datachannel objects after they are created but before they are open.
   this.pendingDataChannels = {};
 
@@ -270,7 +274,17 @@ WebRTCBridge.prototype._dataChannelOpen = function (channel) {
       handler(channel);
     });
   }
-}
+};
+
+WebRTCBridge.prototype._dataChannelMessage = function (channel, evt) {
+  var peer = this;
+  var data = evt.data;
+  console.log('onmessage:', evt.data);
+
+  peer.channelMessageHandlers[channel.label].forEach(function (handler) {
+    handler(channel, data);
+  });
+};
 
 WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
   var labels = Object.keys(this.expectedDataChannels);
@@ -286,6 +300,7 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
     var label = channel.label;
 
     // Reject the dataChannel if we were not expecting it.
+    // That is, if we're expecting some channels but not this one.
     if (labels.length > 0 && typeof peer.expectedDataChannels[label] == "undefined") {
       peer.unexpectedDataChannelCallbacks.forEach(function (cb) {
         cb(channel);
@@ -305,14 +320,7 @@ WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
       channel.onopen = undefined;
     }
 
-    channel.onmessage = function(evt) {
-      var data = evt.data;
-      console.log('onmessage:', evt.data);
-
-      peer.channelMessageHandlers[channel.label].forEach(function (handler) {
-        handler(channel, data);
-      });
-    };
+    channel.onmessage = peer._dataChannelMessage.bind(peer, channel);
 
     channel.onclose = function() {
       console.info('onclose');
@@ -329,6 +337,8 @@ WebRTCBridge.prototype._doCreateAnswer = function () {
   this.inboundIceCandidates.forEach(function(candidate) {
     peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
   });
+
+  this._doCreateDataChannels();
 
   this.inboundIceCandidates = [];
   this.pc.createAnswer(
@@ -348,6 +358,48 @@ WebRTCBridge.prototype._doSendAnswer = function (answer) {
   this.sendAnswerHandlers.forEach(function(handler) {
     handler(answer);
   });
+};
+
+WebRTCBridge.prototype._doCreateDataChannels = function () {
+  var peer = this;
+  var labels = Object.keys(this.dataChannelSettings);
+  labels.forEach(function(label) {
+    var channelOptions = peer.dataChannelSettings[label];
+    peer.createDataChannel(label, channelOptions);
+  });
+};
+
+WebRTCBridge.prototype.createDataChannel = function (label, channelOptions) {
+  var peer = this;
+
+  var onOpen = null;
+  var onMessage = null;
+
+  if (typeof channelOptions.onOpen != "undefined") {
+    onOpen = channelOptions.onOpen;
+    delete channelOptions.onOpen;
+  }
+  if (typeof channelOptions.onMessage != "undefined") {
+    onMessage = channelOptions.onMessage;
+    delete channelOptions.onMessage;
+  }
+
+  var channel = peer.pendingDataChannels[label] = peer.pc.createDataChannel(label, channelOptions);
+  channel.binaryType = 'arraybuffer';
+
+  if (onOpen) {
+    peer.addDataChannelHandler(label, onOpen);
+  }
+  if (onMessage) {
+    peer.addChannelMessageHandler(label, onMessage);
+  }
+  channel.onopen = peer._dataChannelOpen.bind(peer, channel);
+  channel.onmessage = peer._dataChannelMessage.bind(peer, channel);
+
+  channel.onclose = function(event) {
+    console.info('onclose');
+  };
+  channel.onerror = peer._doHandleError.bind(peer);
 };
 
 WebRTCBridge.prototype.recvRemoteIceCandidate = function (data) {
@@ -455,7 +507,13 @@ wss.on('connection', function(ws) {
           channel.send(response.buffer);
         }
       },
-    }
+    },
+    createDataChannels: {
+      'zaptastic': {
+        outOfOrderAllowed: false,
+        maxRetransmitNum: 10
+      },
+    },
   });
 
   peer.addDataChannelHandler(function (channel) {
