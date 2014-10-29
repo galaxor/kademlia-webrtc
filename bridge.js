@@ -50,6 +50,10 @@ function WebRTCBridge (args) {
   // once we've been asked to create the offer or answer.
   this.dataChannelSettings = {};
 
+  if (typeof args != "undefined" && typeof args.createDataChannels != "undefined") {
+    this.dataChannelSettings = args.createDataChannels;
+  }
+
   // This collects the datachannel objects after they are created but before they are open.
   this.pendingDataChannels = {};
 
@@ -511,7 +515,10 @@ wss.on('connection', function(ws) {
     createDataChannels: {
       'zaptastic': {
         outOfOrderAllowed: false,
-        maxRetransmitNum: 10
+        maxRetransmitNum: 10,
+        onOpen: function (channel) {
+          console.log("Data channel", channel.label, "created");
+        },
       },
     },
   });
