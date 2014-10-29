@@ -38,6 +38,10 @@ function WebRTCBridge (args) {
   // for the appropriate dataChannel are called.
   this.channelMessageHandlers = {};
 
+  // These are fired when a data channel is opened.  An application can use
+  // this to initiate communication or prepare to receive communication.
+  this.dataChannelHandlers = {};
+
   if (typeof args != "undefined" && typeof args.expectedDataChannels != "undefined") {
     this.addExpectedDataChannels(args.expectedDataChannels);
   }
@@ -101,10 +105,6 @@ function WebRTCBridge (args) {
   // ready to send the local ICE candidates.
   this.sendLocalIceCandidateHandlers = [];
 
-  // These are fired when a data channel is opened.  An application can use
-  // this to initiate communication or prepare to receive communication.
-  this.dataChannelHandlers = [];
-
   this.dataChannelsOpenCallbacks = [];
 
   // - Bring the standard WebRTC components into our namespace -
@@ -151,21 +151,35 @@ WebRTCBridge.prototype.addIceXferReadyCallback = function (cb) {
  * If there are expected data channels, and an unexpected data channel opens,
  * it will not have any callbacks on it, and the application may register a
  * callback for the situation of rejecting a data channel.
- * There are two forms for calling this:
+ * There are three forms for calling this:
  *  addExpectedDataChannels(['label1', 'label2'])
  *  addExpectedDataChannels({label1: callback, label2: callback})
+ *  addExpectedDataChannels({label1: {onOpen: callback, onMessage: callback}, ...})
  */
 WebRTCBridge.prototype.addExpectedDataChannels = function () {
   var label;
-  var callback = null;
 
   if (typeof arguments[0] == "object") {
     var arg = arguments[0];
     for (var i in arg) {
       label = i;
-      callback = arg[i];
+      var onOpen = null;
+      var onMessage = null;
+
+      if (typeof arg[i] == "function") {
+        onMessage = arg[i];
+      } else {
+        onOpen = arg[i].onOpen;
+        onMessage = arg[i].onMessage;
+      }
+
       this.expectedDataChannels[label] = true;
-      this.addChannelMessageHandler(label, callback);
+      if (onOpen) {
+        this.addDataChannelHandler(label, onOpen);
+      }
+      if (onMessage) {
+        this.addChannelMessageHandler(label, onMessage);
+      }
     }
   } else {
     for (var i=0; i<arguments.length; i++) {
@@ -251,9 +265,11 @@ WebRTCBridge.prototype._dataChannelOpen = function (channel) {
     peer._doAllDataChannelsOpen();
   }
 
-  peer.dataChannelHandlers.forEach(function (handler) {
-    handler(channel);
-  });
+  if (typeof peer.dataChannelHandlers[label] != "undefined") {
+    peer.dataChannelHandlers[label].forEach(function (handler) {
+      handler(channel);
+    });
+  }
 }
 
 WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
@@ -375,8 +391,11 @@ WebRTCBridge.prototype._doHandleError = function (error) {
   throw error;
 }
 
-WebRTCBridge.prototype.addDataChannelHandler = function (handler) {
-  this.dataChannelHandlers.push(handler);
+WebRTCBridge.prototype.addDataChannelHandler = function (label, handler) {
+  if (typeof this.dataChannelHandlers[label] == "undefined") {
+    this.dataChannelHandlers[label] = [];
+  }
+  this.dataChannelHandlers[label].push(handler);
 };
 
 WebRTCBridge.prototype.addDataChannelsOpenCallback = function (cb) {
