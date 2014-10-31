@@ -201,6 +201,59 @@ WebRTCBridge.prototype.addUnexpectedDataChannelCallback = function (cb) {
   this.unexpectedDataChannelCallbacks.push(cb);
 };
 
+WebRTCBridge.prototype._onIceCandidate = function (event) {
+  var peer = this;
+  var candidate;
+
+  // In some webrtc implementations (firefox, chromium), the argument will be
+  // an "event", which will have a key "candidate", which is the ICE
+  // candidate.  In others (nodejs), the argument will be just the ICE
+  // candidate object itself.
+  // But we can't use the presence of a "candidate" key as the test of
+  // eventhood, because the ICE candidate object itself also has a key called
+  // "candidate".
+  if (typeof event.target == "undefined") {
+    candidate = event;
+  } else {
+    candidate = event.candidate;
+  }
+
+  // Apparently, having a null candidate is something that can happen sometimes.
+  // Don't put the burden on the remote side to ignore that garbage.
+  if(!candidate) return;
+
+  if (peer._iceXferReady()) {
+    peer._xferIceCandidate(candidate);
+  } else {
+    peer.outboundIceCandidates.push(candidate);
+  }
+};
+
+WebRTCBridge.prototype.createOffer = function () {
+  var peer = this;
+  this.pc = new this.RTCPeerConnection(
+    {
+      iceServers: [{url:'stun:stun.l.google.com:19302'}]
+    },
+    {
+      'optional': []
+    }
+  );
+  this.pc.onsignalingstatechange = function(event) {
+    console.info('signaling state change:', event);
+  };
+  this.pc.oniceconnectionstatechange = function(event) {
+    console.info("ice connection state change: ", event.target.iceConnectionState);
+  };
+  this.pc.onicegatheringstatechange = function(event) {
+    console.info("ice gathering state change: ", event.target.iceGatheringState);
+  };
+  this.pc.onicecandidate = this._onIceCandidate.bind(this);
+
+  this._doCreateDataChannels();
+  this._doCreateOffer();
+};
+
 WebRTCBridge.prototype.recvOffer = function (data) {
   var offer = new this.RTCSessionDescription(data);
   this.localOrRemoteDescSet = false;
@@ -225,32 +278,7 @@ WebRTCBridge.prototype.recvOffer = function (data) {
   };
 
   var peer = this;
-  this.pc.onicecandidate = function(event) {
-    var candidate;
-
-    // In some webrtc implementations (firefox, chromium), the argument will be
-    // an "event", which will have a key "candidate", which is the ICE
-    // candidate.  In others (nodejs), the argument will be just the ICE
-    // candidate object itself.
-    // But we can't use the presence of a "candidate" key as the test of
-    // eventhood, because the ICE candidate object itself also has a key called
-    // "candidate".
-    if (typeof event.target == "undefined") {
-      candidate = event;
-    } else {
-      candidate = event.candidate;
-    }
-
-    // Apparently, having a null candidate is something that can happen sometimes.
-    // Don't put the burden on the remote side to ignore that garbage.
-    if(!candidate) return;
-
-    if (peer._iceXferReady()) {
-      peer._xferIceCandidate(candidate);
-    } else {
-      peer.outboundIceCandidates.push(candidate);
-    }
-  }
+  this.pc.onicecandidate = this._onIceCandidate.bind(this);
 
   this._doCreateDataChannelCallback(offer);
 
