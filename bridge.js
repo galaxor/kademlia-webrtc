@@ -33,6 +33,14 @@ wss.on('connection', function(ws) {
   var peer = new WebRTCPeer({
     expectedDataChannels: {
       'reliable': function (channel, data) {
+        // Print msg.
+        if('string' == typeof data) {
+          console.log('onmessage:',channel.label, data);
+        } else {
+          console.log('onmessage:',channel.label, new Uint8Array(data));
+        }
+
+        // Reply.
         if('string' == typeof data) {
           channel.send("Hello peer!");
         } else {
