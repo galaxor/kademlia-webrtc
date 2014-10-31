@@ -122,6 +122,8 @@ function WebRTCPeer (args) {
 
   this.dataChannelsOpenCallbacks = [];
 
+  this.sendOfferHandlers = [];
+
   // - Bring the standard WebRTC components into our namespace -
   // At the time of writing, both firefox and chromium keep their WebRTC
   // functions prefixed.  Furthermore, the nodejs wrtc functions are always in
@@ -139,17 +141,6 @@ WebRTCPeer.prototype._iceXferReady = function () {
     return ready;
   });
   return ready;
-};
-
-/**
- * The application should call this when the external comm channel opens.  This
- * will send all the outbound ICE candidates we've been queueing up.
- */
-WebRTCPeer.prototype.sendPendingIceCandidates = function () {
-  var peer = this;
-  this.pendingIceCandidates.forEach(function(candidate) {
-    peer._xferIceCandidate(candidate);
-  });
 };
 
 /**
@@ -292,6 +283,10 @@ WebRTCPeer.prototype._doSendOffer = function (offer) {
   });
 };
 
+WebRTCPeer.prototype.addSendOfferHandler = function (handler) {
+  this.sendOfferHandlers.push(handler);
+};
+
 WebRTCPeer.prototype.recvOffer = function (data) {
   var offer = new this.RTCSessionDescription(data);
   this.localOrRemoteDescSet = false;
@@ -327,6 +322,19 @@ WebRTCPeer.prototype.recvOffer = function (data) {
   );
 };
 
+WebRTCPeer.prototype.recvAnswer = function (desc) {
+  var peer = this;
+  this.pc.setRemoteDescription(
+    new peer.RTCSessionDescription(desc),
+    peer._doWaitforDataChannels.bind(peer),
+    peer._doHandleError.bind(peer)
+  );
+};
+
+WebRTCPeer.prototype._doWaitforDataChannels = function () {
+  console.log('awaiting data channels');
+};
+
 WebRTCPeer.prototype._dataChannelOpen = function (channel) {
   var peer = this;
   var label = channel.label;
@@ -349,7 +357,6 @@ WebRTCPeer.prototype._dataChannelOpen = function (channel) {
 WebRTCPeer.prototype._dataChannelMessage = function (channel, evt) {
   var peer = this;
   var data = evt.data;
-  console.log('onmessage:', evt.data);
 
   peer.channelMessageHandlers[channel.label].forEach(function (handler) {
     handler(channel, data);
@@ -536,4 +543,6 @@ WebRTCPeer.prototype.addSendAnswerHandler = function (handler) {
   this.sendAnswerHandlers.push(handler);
 };
 
-module.exports = exports = WebRTCPeer;
+if (typeof module != "undefined" || typeof exports != "undefined") {
+  module.exports = exports = WebRTCPeer;
+}
