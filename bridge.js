@@ -250,8 +250,39 @@ WebRTCBridge.prototype.createOffer = function () {
   };
   this.pc.onicecandidate = this._onIceCandidate.bind(this);
 
+  this._doCreateDataChannelCallback();
   this._doCreateDataChannels();
   this._doCreateOffer();
+};
+
+WebRTCBridge.prototype._doCreateOffer = function () {
+  var peer = this;
+  this.pc.createOffer(
+    function (offer) {
+      peer.pc.setLocalDescription(
+        new peer.RTCSessionDescription(offer),
+        peer._doSendOffer.bind(peer, offer),
+        peer._doHandleError.bind(peer)
+      );
+    },
+    this._doHandleError.bind(peer)
+  );
+};
+
+WebRTCBridge.prototype._doSendOffer = function (offer) {
+  this.localOrRemoteDescSet = true;
+  this.inboundIceCandidates.forEach(function(candidate) {
+    peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
+  });
+
+  var offerObj = {
+    'type': offer.type,
+    'sdp': offer.sdp,
+  };
+
+  this.sendOfferHandlers.forEach(function (handler) {
+    handler(offerObj);
+  });
 };
 
 WebRTCBridge.prototype.recvOffer = function (data) {
@@ -280,7 +311,7 @@ WebRTCBridge.prototype.recvOffer = function (data) {
   var peer = this;
   this.pc.onicecandidate = this._onIceCandidate.bind(this);
 
-  this._doCreateDataChannelCallback(offer);
+  this._doCreateDataChannelCallback();
 
   this.pc.setRemoteDescription(
     offer,
@@ -318,7 +349,7 @@ WebRTCBridge.prototype._dataChannelMessage = function (channel, evt) {
   });
 };
 
-WebRTCBridge.prototype._doCreateDataChannelCallback = function (offer) {
+WebRTCBridge.prototype._doCreateDataChannelCallback = function () {
   var labels = Object.keys(this.expectedDataChannels);
 
   console.log("Handling data channels");
