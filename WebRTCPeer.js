@@ -1,103 +1,539 @@
-function WebRTCPeer(namespace) {
-  this.pc = null;
-  this.dc = null;
-  this.msgHandlers = [];
-  this.dataChannelOpenHandlers = [];
-
-  if (typeof namespace == "undefined") {
-    this.RTCPeerConnection = RTCPeerConnection;
-    this.RTCSessionDescription = RTCSessionDescription;
-  } else {
-    this.RTCPeerConnection = namespace.RTCPeerConnection;
-    this.RTCSessionDescription = namespace.RTCSessionDescription;
-  }
+if (typeof require == "function") {
+  // If we've been called from nodejs, then 'require' will be a function, and
+  // we can/have to require the wrtc module.
+  // If we've come from a browser, then 'require' doesn't exist, and we'll just
+  // have to hope that they've been given wrtc's dist/wrtc.js in a previous
+  // <script> tag, which will define wrtc.
+  var wrtc = require('wrtc');
 }
 
-WebRTCPeer.prototype.createOffer = function (callback) {
-  var peer = this;
+function WebRTCPeer (args) {
+  // This is the WebRTCPeerconnection object.
+  this.pc = null;
 
-  this.pc = new this.RTCPeerConnection(null);
-  this.dc = this.pc.createDataChannel('zapchan');
-  this.dc.onopen = function () { peer.dataChannelOpen(this) };
+  // - Data channel things -
+
+  // This defines what data channels we expect to exist.
+  // Data channels are created by the peer that's creating the offer.
+  // The side that receives the offer just opens the offered channels.
+  // Therefore, these settings only have meaning for the side that's creating
+  // the offer.
+  // However, the side that's receiving the offer uses this list to know what
+  // channels to expect.  We should probably leave this type of thing up to the
+  // application, but instead, it is currently hard-coded to create (if
+  // offering) or expect (if receiving) one data channel named 'reliable'.
+  // "Expecting" this channel (on the receiving end) does not do anything
+  // except set the number of data channels we expect to exist.
+  // When that number of data channels have been opened, we fire our "complete"
+  // callback, which currently doesn't do anything.
+  // Note:  This business of the offering side being the only one that creates
+  // data channels?  This is a quirk of this WebRTCPeer class, and is not
+  // inherent to the WebRTC API.  A more flexible system could be created, that
+  // would give the application more control over its data channels.
+
+  // This defines what data channels we expect the remote side to open.
+  // If it's empty, we will allow the remote side to open any data channels.
+  // But if there are expected data channels set (by addExpectedDataChannels),
+  // and the remote side tries to open one with a different name, we will
+  // reject it.
+  // Also, if we set expectedDataChannels, then we can fire callbacks (from
+  // dataChannelsOpenCallbacks) when all of them are open.
+  this.expectedDataChannels = {};
+  this.unexpectedDataChannelCallbacks = [];
+
+  // These are called when a message is received on a channel.  The handlers
+  // for the appropriate dataChannel are called.
+  this.channelMessageHandlers = {};
+
+  // These are fired when a data channel is opened.  An application can use
+  // this to initiate communication or prepare to receive communication.
+  this.dataChannelHandlers = {};
+
+  if (typeof args != "undefined" && typeof args.expectedDataChannels != "undefined") {
+    this.addExpectedDataChannels(args.expectedDataChannels);
+  }
+
+  // This is the list of data channels we want to create.  We will create them
+  // once we've been asked to create the offer or answer.
+  this.dataChannelSettings = {};
+
+  if (typeof args != "undefined" && typeof args.createDataChannels != "undefined") {
+    this.dataChannelSettings = args.createDataChannels;
+  }
+
+  // This collects the datachannel objects after they are created but before they are open.
+  this.pendingDataChannels = {};
+
+  // This collects the datachannel objects after they are open.
+  this.dataChannels = {};
+
+
+  // - ICE candidate things - 
+
+  // ICE Candidate queues.
+  // We can't accept inbound ICE candidates until we've setRemoteDescription.
+  // We can't send outbound ICE candidates until our external, non-webrtc
+  // communication channel is open, whatever that may be.
+
+  // Inbound:  They may start sending us ICE candidates before we're ready.
+  // We're ready once we've setLocalDescription or setRemoteDescription.
+  // Before that happens, queue the ICE candidates.
+  this.inboundIceCandidates = [];
+
+  // This variable keeps track of whether we've set the local desc or remote
+  // desc.  If it is false, we must continue queueing inbound ICE candidates.
+  // If it is true, we can start adding them to the peerConnection right away.
+  // Also, once we've set the local or remote description, we will add all the
+  // ICE candidates in the queue.
+  this.localOrRemoteDescSet = false;
+
+  // Outbound:  We may start generating ICE candidates before we're ready to send them.
+  // For example, if we are the one to send the offer, we may
+  // setLocalDescription before our external comm channel is open (possibly
+  // websocket).  If we start generating ICE candidates before we're ready to
+  // send them, start queueing them.
+  this.outboundIceCandidates = [];
+
+  // We can only transfer ice candidates if the external channel is open.  This
+  // is not something that's within the scope of webrtc.  Therefore, we defer
+  // to the application to tell us when we're ready to transfer ICE candidates.
+  // They are allowed to register callbacks.  Whenever we get an ICE candidate,
+  // we will check to see if the comm channel is ready.  If not, we add the ICE
+  // candidate to the outbound queue.
+  // Also, we expect the application to call sendPendingIceCandidates when the
+  // comm channel opens.
+  this.iceXferReadyCallbacks = [];
+
+
+  // - Event handler queues -
+  // The application can register handlers for certain events.  They are
+  // collected in these queues.
+
+  // These are fired when we create the WebRTC answer.  The application can
+  // register handlers that should probably do something to send the answer we
+  // created back to the other WebRTC peer, so we can establish communication.
+  this.sendAnswerHandlers = [];
+
+  // These are fired when we are ready to send an ICE candidate to the other WebRTC peer.
+  // The application does not need to worry about such things ans outbound ICE
+  // candidate queues.  These handlers are called only when we are actually
+  // ready to send the local ICE candidates.
+  this.sendLocalIceCandidateHandlers = [];
+
+  this.dataChannelsOpenCallbacks = [];
+
+  // - Bring the standard WebRTC components into our namespace -
+  // At the time of writing, both firefox and chromium keep their WebRTC
+  // functions prefixed.  Furthermore, the nodejs wrtc functions are always in
+  // the module's namespace.  No matter where they are, let's make them
+  // functions belonging to this class, so we know where to find them.
+  this.RTCPeerConnection = wrtc.RTCPeerConnection;
+  this.RTCSessionDescription = wrtc.RTCSessionDescription;
+  this.RTCIceCandidate = wrtc.RTCIceCandidate;
+}
+
+WebRTCPeer.prototype._iceXferReady = function () {
+  var ready = null;
+  this.iceXferReadyCallbacks.every(function (cb) {
+    ready = cb();
+    return ready;
+  });
+  return ready;
+};
+
+/**
+ * The application should call this when the external comm channel opens.  This
+ * will send all the outbound ICE candidates we've been queueing up.
+ */
+WebRTCPeer.prototype.sendPendingIceCandidates = function () {
+  var peer = this;
+  this.pendingIceCandidates.forEach(function(candidate) {
+    peer._xferIceCandidate(candidate);
+  });
+};
+
+/**
+ * Let the application register callbacks to tell us if the external comm
+ * channel is open and ready to send ICE candidates.
+ */
+WebRTCPeer.prototype.addIceXferReadyCallback = function (cb) {
+  this.iceXferReadyCallbacks.push(cb);
+};
+
+/**
+ * Let the application set which data channel labels to expect.
+ * If there are no expectations, any data channel that opens is okay.
+ * If there are expected data channels, and an unexpected data channel opens,
+ * it will not have any callbacks on it, and the application may register a
+ * callback for the situation of rejecting a data channel.
+ * There are three forms for calling this:
+ *  addExpectedDataChannels(['label1', 'label2'])
+ *  addExpectedDataChannels({label1: callback, label2: callback})
+ *  addExpectedDataChannels({label1: {onOpen: callback, onMessage: callback}, ...})
+ */
+WebRTCPeer.prototype.addExpectedDataChannels = function () {
+  var label;
+
+  if (typeof arguments[0] == "object") {
+    var arg = arguments[0];
+    for (var i in arg) {
+      label = i;
+      var onOpen = null;
+      var onMessage = null;
+
+      if (typeof arg[i] == "function") {
+        onMessage = arg[i];
+      } else {
+        onOpen = arg[i].onOpen;
+        onMessage = arg[i].onMessage;
+      }
+
+      this.expectedDataChannels[label] = true;
+      if (onOpen) {
+        this.addDataChannelHandler(label, onOpen);
+      }
+      if (onMessage) {
+        this.addChannelMessageHandler(label, onMessage);
+      }
+    }
+  } else {
+    for (var i=0; i<arguments.length; i++) {
+      label = arguments[i];
+      this.expectedDataChannels[label] = true;
+    }
+  }
+};
+
+WebRTCPeer.prototype.addUnexpectedDataChannelCallback = function (cb) {
+  this.unexpectedDataChannelCallbacks.push(cb);
+};
+
+WebRTCPeer.prototype._onIceCandidate = function (event) {
+  var peer = this;
+  var candidate;
+
+  // In some webrtc implementations (firefox, chromium), the argument will be
+  // an "event", which will have a key "candidate", which is the ICE
+  // candidate.  In others (nodejs), the argument will be just the ICE
+  // candidate object itself.
+  // But we can't use the presence of a "candidate" key as the test of
+  // eventhood, because the ICE candidate object itself also has a key called
+  // "candidate".
+  if (typeof event.target == "undefined") {
+    candidate = event;
+  } else {
+    candidate = event.candidate;
+  }
+
+  // Apparently, having a null candidate is something that can happen sometimes.
+  // Don't put the burden on the remote side to ignore that garbage.
+  if(!candidate) return;
+
+  if (peer._iceXferReady()) {
+    peer._xferIceCandidate(candidate);
+  } else {
+    peer.outboundIceCandidates.push(candidate);
+  }
+};
+
+WebRTCPeer.prototype.createOffer = function () {
+  var peer = this;
+  this.pc = new this.RTCPeerConnection(
+    {
+      iceServers: [{url:'stun:stun.l.google.com:19302'}]
+    },
+    {
+      'optional': []
+    }
+  );
+  this.pc.onsignalingstatechange = function(event) {
+    console.info('signaling state change:', event);
+  };
+  this.pc.oniceconnectionstatechange = function(event) {
+    console.info("ice connection state change: ", event.target.iceConnectionState);
+  };
+  this.pc.onicegatheringstatechange = function(event) {
+    console.info("ice gathering state change: ", event.target.iceGatheringState);
+  };
+  this.pc.onicecandidate = this._onIceCandidate.bind(this);
+
+  this._doCreateDataChannelCallback();
+  this._doCreateDataChannels();
+  this._doCreateOffer();
+};
+
+WebRTCPeer.prototype._doCreateOffer = function () {
+  var peer = this;
   this.pc.createOffer(
     function (offer) {
       peer.pc.setLocalDescription(
-        offer,
-        function () {
-          callback(offer);
-        },
-        function (e) { console.log(e); }
+        new peer.RTCSessionDescription(offer),
+        peer._doSendOffer.bind(peer, offer),
+        peer._doHandleError.bind(peer)
       );
     },
-    function (e) { console.log(e); }
+    this._doHandleError.bind(peer)
   );
 };
 
-WebRTCPeer.prototype.createAnswer = function (desc, callback) {
-  var peer = this;
+WebRTCPeer.prototype._doSendOffer = function (offer) {
+  this.localOrRemoteDescSet = true;
+  this.inboundIceCandidates.forEach(function(candidate) {
+    peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
+  });
 
-  this.pc = new this.RTCPeerConnection(null);
-  this.pc.ondatachannel = function (event) {
-    peer.dc = event.channel;
-
-    peer.dc.onopen = function () { peer.dataChannelOpen(this); };
+  var offerObj = {
+    'type': offer.type,
+    'sdp': offer.sdp,
   };
 
+  this.sendOfferHandlers.forEach(function (handler) {
+    handler(offerObj);
+  });
+};
+
+WebRTCPeer.prototype.recvOffer = function (data) {
+  var offer = new this.RTCSessionDescription(data);
+  this.localOrRemoteDescSet = false;
+
+  this.pc = new this.RTCPeerConnection(
+    {
+      iceServers: [{url:'stun:stun.l.google.com:19302'}]
+    },
+    {
+      'optional': [{DtlsSrtpKeyAgreement: false}]
+    }
+  );
+
+  this.pc.onsignalingstatechange = function(event) {
+    console.info('signaling state change:', event);
+  };
+  this.pc.oniceconnectionstatechange = function(state) {
+    console.info('ice connection state change:', state);
+  };
+  this.pc.onicegatheringstatechange = function(state) {
+    console.info('ice gathering state change:', state);
+  };
+
+  var peer = this;
+  this.pc.onicecandidate = this._onIceCandidate.bind(this);
+
+  this._doCreateDataChannelCallback();
+
   this.pc.setRemoteDescription(
-    new this.RTCSessionDescription(desc),
-    function () {
-      peer.pc.createAnswer(
-        function (answer) {
-          var answerdesc = new peer.RTCSessionDescription(answer);
-          peer.pc.setLocalDescription(
-            answerdesc,
-            function () {
-              callback(answer);
-            }
-          );
-        },
-        function (e) { console.log(e); }
+    offer,
+    peer._doCreateAnswer.bind(peer),
+    peer._doHandleError.bind(peer)
+  );
+};
+
+WebRTCPeer.prototype._dataChannelOpen = function (channel) {
+  var peer = this;
+  var label = channel.label;
+  var labels = Object.keys(this.expectedDataChannels);
+
+  console.info('onopen');
+  peer.dataChannels[label] = channel;
+  delete peer.pendingDataChannels[label];
+  if (labels.length > 0 && Object.keys(peer.dataChannels).length === labels.length) {
+    peer._doAllDataChannelsOpen();
+  }
+
+  if (typeof peer.dataChannelHandlers[label] != "undefined") {
+    peer.dataChannelHandlers[label].forEach(function (handler) {
+      handler(channel);
+    });
+  }
+};
+
+WebRTCPeer.prototype._dataChannelMessage = function (channel, evt) {
+  var peer = this;
+  var data = evt.data;
+  console.log('onmessage:', evt.data);
+
+  peer.channelMessageHandlers[channel.label].forEach(function (handler) {
+    handler(channel, data);
+  });
+};
+
+WebRTCPeer.prototype._doCreateDataChannelCallback = function () {
+  var labels = Object.keys(this.expectedDataChannels);
+
+  console.log("Handling data channels");
+
+  var peer = this;
+
+  this.pc.ondatachannel = function(evt) {
+    var channel = evt.channel;
+
+    console.log('ondatachannel', channel.label, channel.readyState);
+    var label = channel.label;
+
+    // Reject the dataChannel if we were not expecting it.
+    // That is, if we're expecting some channels but not this one.
+    if (labels.length > 0 && typeof peer.expectedDataChannels[label] == "undefined") {
+      peer.unexpectedDataChannelCallbacks.forEach(function (cb) {
+        cb(channel);
+      });
+      return;
+    }
+
+    peer.pendingDataChannels[label] = channel;
+    channel.binaryType = 'arraybuffer';
+    channel.onopen = peer._dataChannelOpen.bind(peer, channel);
+
+    if (channel.readyState == "open") {
+      // Manully open the channel in case it was created in the open state.  If
+      // that happens, we don't set the "onopen" until later, so it will never
+      // be called.  Therefore, we detect that case and call it here.
+      channel.onopen();
+      channel.onopen = undefined;
+    }
+
+    channel.onmessage = peer._dataChannelMessage.bind(peer, channel);
+
+    channel.onclose = function() {
+      console.info('onclose');
+    };
+
+    channel.onerror = peer._doHandleError.bind(peer);
+  };
+};
+
+WebRTCPeer.prototype._doCreateAnswer = function () {
+  var peer = this;
+
+  this.localOrRemoteDescSet = true;
+  this.inboundIceCandidates.forEach(function(candidate) {
+    peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
+  });
+
+  this._doCreateDataChannels();
+
+  this.inboundIceCandidates = [];
+  this.pc.createAnswer(
+    function (answer) {
+      peer.pc.setLocalDescription(
+        answer,
+        peer._doSendAnswer.bind(peer, answer),
+        peer._doHandleError.bind(peer)
       );
     },
-    function (e) { console.log(e); }
+    peer._doHandleError.bind(peer)
   );
 };
 
-WebRTCPeer.prototype.recvAnswer = function (desc) {
+WebRTCPeer.prototype._doSendAnswer = function (answer) {
   var peer = this;
-
-  // The dataChannel's onopen handler was already set by createOffer or createAnswer.
-
-  this.pc.setRemoteDescription(
-    new this.RTCSessionDescription(desc),
-    function () {},
-    function (e) { console.log(e); }
-  );
+  this.sendAnswerHandlers.forEach(function(handler) {
+    handler(answer);
+  });
 };
 
-WebRTCPeer.prototype.addDataChannelOpenHandler = function (handler) {
-  this.dataChannelOpenHandlers[this.dataChannelOpenHandlers.length] = handler;
+WebRTCPeer.prototype._doCreateDataChannels = function () {
+  var peer = this;
+  var labels = Object.keys(this.dataChannelSettings);
+  labels.forEach(function(label) {
+    var channelOptions = peer.dataChannelSettings[label];
+    peer.createDataChannel(label, channelOptions);
+  });
 };
 
-WebRTCPeer.prototype.dataChannelOpen = function (dc) {
+WebRTCPeer.prototype.createDataChannel = function (label, channelOptions) {
   var peer = this;
-  dc.onmessage = function (event) { peer.onMessage(event); };
 
-  for (var i=0; i<this.dataChannelOpenHandlers.length; i++) {
-    this.dataChannelOpenHandlers[i](dc);
+  var onOpen = null;
+  var onMessage = null;
+
+  if (typeof channelOptions.onOpen != "undefined") {
+    onOpen = channelOptions.onOpen;
+    delete channelOptions.onOpen;
+  }
+  if (typeof channelOptions.onMessage != "undefined") {
+    onMessage = channelOptions.onMessage;
+    delete channelOptions.onMessage;
+  }
+
+  var channel = peer.pendingDataChannels[label] = peer.pc.createDataChannel(label, channelOptions);
+  channel.binaryType = 'arraybuffer';
+
+  if (onOpen) {
+    peer.addDataChannelHandler(label, onOpen);
+  }
+  if (onMessage) {
+    peer.addChannelMessageHandler(label, onMessage);
+  }
+  channel.onopen = peer._dataChannelOpen.bind(peer, channel);
+  channel.onmessage = peer._dataChannelMessage.bind(peer, channel);
+
+  channel.onclose = function(event) {
+    console.info('onclose');
+  };
+  channel.onerror = peer._doHandleError.bind(peer);
+};
+
+WebRTCPeer.prototype.recvRemoteIceCandidate = function (data) {
+  if (this.localOrRemoteDescSet) {
+    this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
+  } else {
+    this.inboundIceCandidates.push(data);
   }
 };
 
-WebRTCPeer.prototype.addMsgHandler = function (handler) {
-  this.msgHandlers[this.msgHandlers.length] = handler;
+WebRTCPeer.prototype.addSendLocalIceCandidateHandler = function (handler) {
+  this.sendLocalIceCandidateHandlers.push(handler);
 };
 
-WebRTCPeer.prototype.onMessage = function (event) {
-  for (var i=0; i<this.msgHandlers.length; i++) {
-    this.msgHandlers[i](event);
-  }
+WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
+  var iceCandidate = {
+    'type': 'ice',
+    'sdp': {
+      'candidate': candidate.candidate,
+      'sdpMid': candidate.sdpMid,
+      'sdpMLineIndex': candidate.sdpMLineIndex
+    }
+  };
+
+  console.info(JSON.stringify(iceCandidate));
+
+  this.sendLocalIceCandidateHandlers.forEach(function (handler) {
+    handler(iceCandidate);
+  });
 };
 
-if (typeof module != "undefined") {
-  module.exports = exports = WebRTCPeer;
+WebRTCPeer.prototype._doAllDataChannelsOpen = function () {
+  var peer = this;
+  console.log('complete');
+  this.dataChannelsOpenCallbacks.forEach(function (cb) {
+    cb(peer.dataChannels);
+  });
+};
+
+WebRTCPeer.prototype._doHandleError = function (error) {
+  throw error;
 }
+
+WebRTCPeer.prototype.addDataChannelHandler = function (label, handler) {
+  if (typeof this.dataChannelHandlers[label] == "undefined") {
+    this.dataChannelHandlers[label] = [];
+  }
+  this.dataChannelHandlers[label].push(handler);
+};
+
+WebRTCPeer.prototype.addDataChannelsOpenCallback = function (cb) {
+  this.dataChannelsOpenCallbacks.push(cb);
+};
+
+
+WebRTCPeer.prototype.addChannelMessageHandler = function (label, handler) {
+  if (typeof this.channelMessageHandlers[label] == "undefined") {
+    this.channelMessageHandlers[label] = [];
+  }
+  this.channelMessageHandlers[label].push(handler);
+};
+
+WebRTCPeer.prototype.addSendAnswerHandler = function (handler) {
+  this.sendAnswerHandlers.push(handler);
+};
+
+module.exports = exports = WebRTCPeer;
