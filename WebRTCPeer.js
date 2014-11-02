@@ -13,24 +13,6 @@ function WebRTCPeer (args) {
 
   // - Data channel things -
 
-  // This defines what data channels we expect to exist.
-  // Data channels are created by the peer that's creating the offer.
-  // The side that receives the offer just opens the offered channels.
-  // Therefore, these settings only have meaning for the side that's creating
-  // the offer.
-  // However, the side that's receiving the offer uses this list to know what
-  // channels to expect.  We should probably leave this type of thing up to the
-  // application, but instead, it is currently hard-coded to create (if
-  // offering) or expect (if receiving) one data channel named 'reliable'.
-  // "Expecting" this channel (on the receiving end) does not do anything
-  // except set the number of data channels we expect to exist.
-  // When that number of data channels have been opened, we fire our "complete"
-  // callback, which currently doesn't do anything.
-  // Note:  This business of the offering side being the only one that creates
-  // data channels?  This is a quirk of this WebRTCPeer class, and is not
-  // inherent to the WebRTC API.  A more flexible system could be created, that
-  // would give the application more control over its data channels.
-
   // This defines what data channels we expect the remote side to open.
   // If it's empty, we will allow the remote side to open any data channels.
   // But if there are expected data channels set (by addExpectedDataChannels),
@@ -40,6 +22,10 @@ function WebRTCPeer (args) {
   // dataChannelsOpenCallbacks) when all of them are open.
   this.expectedDataChannels = {};
   this.unexpectedDataChannelCallbacks = [];
+
+  if (typeof args != "undefined" && typeof args.unexpectedDataChannel != "undefined") {
+    this.addUnexpectedDataChannelCallback(args.unexpectedDataChannel);
+  }
 
   // These are called when a message is received on a channel.  The handlers
   // for the appropriate dataChannel are called.
@@ -104,6 +90,9 @@ function WebRTCPeer (args) {
   // comm channel opens.
   this.iceXferReadyCallbacks = [];
 
+  if (typeof args != "undefined" && typeof args.iceXferReady != "undefined") {
+    this.addIceXferReadyCallback(args.iceXferReady);
+  }
 
   // - Event handler queues -
   // The application can register handlers for certain events.  They are
@@ -114,15 +103,27 @@ function WebRTCPeer (args) {
   // created back to the other WebRTC peer, so we can establish communication.
   this.sendAnswerHandlers = [];
 
+  if (typeof args != "undefined" && typeof args.sendAnswer != "undefined") {
+    this.addSendAnswerHandler(args.sendAnswer);
+  }
+
   // These are fired when we are ready to send an ICE candidate to the other WebRTC peer.
   // The application does not need to worry about such things ans outbound ICE
   // candidate queues.  These handlers are called only when we are actually
   // ready to send the local ICE candidates.
   this.sendLocalIceCandidateHandlers = [];
 
+  if (typeof args != "undefined" && typeof args.sendLocalIce != "undefined") {
+    this.addSendLocalIceCandidateHandler(args.sendLocalIce);
+  }
+
   this.dataChannelsOpenCallbacks = [];
 
   this.sendOfferHandlers = [];
+
+  if (typeof args != "undefined" && typeof args.sendOffer != "undefined") {
+    this.addSendOfferHandler(args.sendOffer);
+  }
 
   // - Bring the standard WebRTC components into our namespace -
   // At the time of writing, both firefox and chromium keep their WebRTC

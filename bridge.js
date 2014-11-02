@@ -49,6 +49,7 @@ wss.on('connection', function(ws) {
         }
       },
     },
+
     createDataChannels: {
       'zaptastic': {
         outOfOrderAllowed: false,
@@ -58,33 +59,25 @@ wss.on('connection', function(ws) {
         },
       },
     },
-  });
 
-  peer.addDataChannelHandler(function (channel) {
-    console.log("Channel open btw:", channel.label);
-  });
+    sendLocalIce: function (iceCandidate) {
+      ws.send(JSON.stringify(iceCandidate));
+    },
 
-  peer.addUnexpectedDataChannelCallback(function (channel) {
-    console.log("Unexpected data channel rejected (" + channel.label + ").");
-  });
+    sendAnswer: function (answer) {
+      ws.send(JSON.stringify(answer));
+    },
+    
+    // We don't need to call peer.sendPendingIceCandidates because we can't get
+    // to this point in the code without the comm channel being open.  Therefore,
+    // we don't start generating ICE candidates until after the channel is open.
+    // We will never have to queue any up to send.  Everything will get sent
+    // right away.
 
-  peer.addSendLocalIceCandidateHandler(function (iceCandidate) {
-    ws.send(JSON.stringify(iceCandidate));
-  });
-
-  peer.addSendAnswerHandler(function (answer) {
-    ws.send(JSON.stringify(answer));
-  });
-
-  // We don't need to call peer.sendPendingIceCandidates because we can't get
-  // to this point in the code without the comm channel being open.  Therefore,
-  // we don't start generating ICE candidates until after the channel is open.
-  // We will never have to queue any up to send.  Everything will get sent
-  // right away.
-
-  // Therefore, we can just return TRUE when asked if we're ready to send.
-  peer.addIceXferReadyCallback(function (cb) {
-    return true;
+    // Therefore, we can just return TRUE when asked if we're ready to send.
+    iceXferReady: function () {
+      return true;
+    },
   });
 
   ws.on('message', function(data) {

@@ -25,20 +25,21 @@ var peer = new WebRTCPeer({
       },
     },
   },
-});
 
-peer.addSendLocalIceCandidateHandler(function (candidate) {
-  ws.send(JSON.stringify(candidate));
-});
-peer.addIceXferReadyCallback(function (cb) {
-  return WebSocket.OPEN == ws.readyState;
+  sendLocalIce: function (candidate) {
+    ws.send(JSON.stringify(candidate));
+  },
+
+  iceXferReady: function () {
+    return WebSocket.OPEN == ws.readyState;
+  },
+
+  sendOffer: function (offer) {
+    ws.send(JSON.stringify(offer));
+  },
 });
 
 ws.onopen = function() {
-  peer.addSendOfferHandler(function (offer) {
-    ws.send(JSON.stringify(offer));
-  });
-
   peer.createOffer();
 };
 
