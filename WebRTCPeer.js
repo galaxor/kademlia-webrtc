@@ -26,21 +26,21 @@ if (typeof require == "function") {
  * The constructor is where you can pass a bunch of the callbacks that make this run.
  * The args object has these members.
  *
- * sendOffer: function (answer)
+ * sendOffer: function (peer, answer)
  *   This callback is called after an offer is created by the local side (as a
  *   result of a call to createOffer).  This callback must somehow send the
  *   offer to the remote side.
  *
- * sendAnswer: function (answer)
+ * sendAnswer: function (peer, answer)
  *   This callback is called after an answer is created by the local side (as a
  *   result of a call to recvOffer).  This callback must somehow send the
  *   answer to the remote side.
  *
- * sendLocalIce: function (iceCandidate)
+ * sendLocalIce: function (peer, iceCandidate)
  *   This callback is called when a local ICE candidate is created.  The
  *   callback must somehow send the ICE candidate to the remote side.
  *
- * iceXferReady: function ()
+ * iceXferReady: function (peer)
  *   The local side may start to generate ICE candidates before we are ready to send them.
  *   For example, if we are sending our ICE candidates over WebSocket, then
  *   perhaps we have not yet established the WebSocket connection.
@@ -52,9 +52,9 @@ if (typeof require == "function") {
  *   remote side to open.
  *   The key may have two types of values:  An object or a function.
  *   If it's an object, then we expect two keys:
- *     onMessage:  function (channel, data)
+ *     onMessage:  function (peer, channel, data)
  *       A callback to run when there is a message on this channel.
- *     onOpen: function (channel)
+ *     onOpen: function (peer, channel)
  *       A callback to run when this channel is opened for the first time.
  *   If the value for this expected datachannel is a function rather than an
  *   object, then it specifies the onMessage callback:  function (channel,
@@ -73,12 +73,12 @@ if (typeof require == "function") {
  *   function, so they should be as specified here:
  *    https://w3c.github.io/webrtc-pc/#widl-RTCPeerConnection-createDataChannel-RTCDataChannel-DOMString-label-RTCDataChannelInit-dataChannelDict
  *   The callbacks are:
- *     onMessage:  function (channel, data)
+ *     onMessage:  function (peer, channel, data)
  *       A callback to run when there is a message on this channel.
- *     onOpen: function (channel)
+ *     onOpen: function (peer, channel)
  *       A callback to run when this channel is opened for the first time.
  *
- * unexpectedDataChannel: function (channel)
+ * unexpectedDataChannel: function (peer, channel)
  *   This callback is called when the remote side attempts to open a
  *   dataChannel that we did not list in expectedDataChannels.  If we did not
  *   list anything in expectedDataChannels, this will never be called.
@@ -230,7 +230,7 @@ function WebRTCPeer (args) {
  * Sometime after creating the offer, your application will receive an answer.
  * Call recvAnswer(answer) when you do.
  */
-WebRTCPeer.prototype.createOffer = function () {
+WebRTCPeer.prototype.createOffer = function (createDataChannels) {
   var peer = this;
   this.pc = new this.RTCPeerConnection(
     {
@@ -240,6 +240,11 @@ WebRTCPeer.prototype.createOffer = function () {
       'optional': []
     }
   );
+
+  if (typeof createDataChannels != 'undefined') {
+    peer.dataChannelSettings = createDataChannels;
+  }
+  
   this.pc.onsignalingstatechange = function(event) {
     console.info('signaling state change:', event);
   };
@@ -318,9 +323,10 @@ WebRTCPeer.prototype.send = function (label, message) {
 }
 
 WebRTCPeer.prototype._iceXferReady = function () {
-  var ready = null;
+  var peer = this;
+  var ready = true;
   this.iceXferReadyCallbacks.every(function (cb) {
-    ready = cb();
+    ready = cb(peer);
     return ready;
   });
   return ready;
@@ -400,6 +406,10 @@ WebRTCPeer.prototype._onIceCandidate = function (event) {
   // "candidate".
   if (typeof event.target == "undefined") {
     candidate = event;
+    if (typeof candidate.candidate != "undefined" && candidate.candidate == null) { return; }
+    if (typeof candidate.candidate != "undefined" && typeof candidate.candidate.candidate != "undefined") {
+      candidate = candidate.candidate;
+    }
   } else {
     candidate = event.candidate;
   }
@@ -430,6 +440,7 @@ WebRTCPeer.prototype._doCreateOffer = function () {
 };
 
 WebRTCPeer.prototype._doSendOffer = function (offer) {
+  var peer = this;
   this.localOrRemoteDescSet = true;
   this.inboundIceCandidates.forEach(function(candidate) {
     peer.pc.addIceCandidate(new peer.RTCIceCandidate(candidate.sdp));
@@ -441,7 +452,7 @@ WebRTCPeer.prototype._doSendOffer = function (offer) {
   };
 
   this.sendOfferHandlers.forEach(function (handler) {
-    handler(offerObj);
+    handler(peer, offerObj);
   });
 };
 
@@ -467,7 +478,7 @@ WebRTCPeer.prototype._dataChannelOpen = function (channel) {
 
   if (typeof peer.dataChannelHandlers[label] != "undefined") {
     peer.dataChannelHandlers[label].forEach(function (handler) {
-      handler(channel);
+      handler(peer, channel);
     });
   }
 };
@@ -477,7 +488,7 @@ WebRTCPeer.prototype._dataChannelMessage = function (channel, evt) {
   var data = evt.data;
 
   peer.channelMessageHandlers[channel.label].forEach(function (handler) {
-    handler(channel, data);
+    handler(peer, channel, data);
   });
 };
 
@@ -498,7 +509,7 @@ WebRTCPeer.prototype._doCreateDataChannelCallback = function () {
     // That is, if we're expecting some channels but not this one.
     if (labels.length > 0 && typeof peer.expectedDataChannels[label] == "undefined") {
       peer.unexpectedDataChannelCallbacks.forEach(function (cb) {
-        cb(channel);
+        cb(peer, channel);
       });
       return;
     }
@@ -551,7 +562,7 @@ WebRTCPeer.prototype._doCreateAnswer = function () {
 WebRTCPeer.prototype._doSendAnswer = function (answer) {
   var peer = this;
   this.sendAnswerHandlers.forEach(function(handler) {
-    handler(answer);
+    handler(peer, answer);
   });
 };
 
@@ -599,7 +610,8 @@ WebRTCPeer.prototype.createDataChannel = function (label, channelOptions) {
 
 WebRTCPeer.prototype.recvRemoteIceCandidate = function (data) {
   if (this.localOrRemoteDescSet) {
-    this.pc.addIceCandidate(new this.RTCIceCandidate(data.sdp.candidate));
+    var candidate = new this.RTCIceCandidate(data.sdp);
+    this.pc.addIceCandidate(candidate);
   } else {
     this.inboundIceCandidates.push(data);
   }
@@ -610,6 +622,7 @@ WebRTCPeer.prototype.addSendLocalIceCandidateHandler = function (handler) {
 };
 
 WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
+  var peer = this;
   var iceCandidate = {
     'type': 'ice',
     'sdp': {
@@ -619,10 +632,8 @@ WebRTCPeer.prototype._xferIceCandidate = function (candidate) {
     }
   };
 
-  console.info(JSON.stringify(iceCandidate));
-
   this.sendLocalIceCandidateHandlers.forEach(function (handler) {
-    handler(iceCandidate);
+    handler(peer, iceCandidate);
   });
 };
 

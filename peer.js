@@ -11,12 +11,12 @@ var peer = new WebRTCPeer({
     reliable: {
       outOfOrderAllowed: false,
       maxRetransmitNum: 10,
-      onOpen: function (channel) {
+      onOpen: function (peer, channel) {
         var data = new Uint8Array([97, 99, 107, 0]);
         channel.send(data.buffer);
         channel.send("Hello bridge!");
       },
-      onMessage: function (channel, data) {
+      onMessage: function (peer, channel, data) {
         if('string' == typeof data) {
           console.log('onmessage:',channel.label, data);
         } else {
@@ -26,15 +26,16 @@ var peer = new WebRTCPeer({
     },
   },
 
-  sendLocalIce: function (candidate) {
+  sendLocalIce: function (peer, candidate) {
+    console.log("Going to send ", candidate);
     ws.send(JSON.stringify(candidate));
   },
 
-  iceXferReady: function () {
+  iceXferReady: function (peer) {
     return WebSocket.OPEN == ws.readyState;
   },
 
-  sendOffer: function (offer) {
+  sendOffer: function (peer, offer) {
     ws.send(JSON.stringify(offer));
   },
 });
@@ -48,7 +49,7 @@ ws.onmessage = function(event) {
   if('answer' == data.type) {
     peer.recvAnswer(data);
   } else if('ice' == data.type) {
-    console.log(data);
+    console.log("Recvd remote candidate", data);
     peer.recvRemoteIceCandidate(data);
   }
 };

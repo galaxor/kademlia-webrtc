@@ -32,7 +32,7 @@ wss.on('connection', function(ws) {
 
   var peer = new WebRTCPeer({
     expectedDataChannels: {
-      'reliable': function (channel, data) {
+      'reliable': function (peer, channel, data) {
         // Print msg.
         if('string' == typeof data) {
           console.log('onmessage:',channel.label, data);
@@ -54,17 +54,17 @@ wss.on('connection', function(ws) {
       'zaptastic': {
         outOfOrderAllowed: false,
         maxRetransmitNum: 10,
-        onOpen: function (channel) {
+        onOpen: function (peer, channel) {
           console.log("Data channel", channel.label, "created");
         },
       },
     },
 
-    sendLocalIce: function (iceCandidate) {
+    sendLocalIce: function (peer, iceCandidate) {
       ws.send(JSON.stringify(iceCandidate));
     },
 
-    sendAnswer: function (answer) {
+    sendAnswer: function (peer, answer) {
       ws.send(JSON.stringify(answer));
     },
     
@@ -75,7 +75,7 @@ wss.on('connection', function(ws) {
     // right away.
 
     // Therefore, we can just return TRUE when asked if we're ready to send.
-    iceXferReady: function () {
+    iceXferReady: function (peer) {
       return true;
     },
   });
