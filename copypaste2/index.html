@@ -1,0 +1,47 @@
+<html>
+<head>
+<title>WRTC Test</title>
+<script src="../jquery-1.11.1.min.js"></script>
+<script src="../node_modules/wrtc/dist/wrtc.js"></script>
+<script src="../WebRTCPeer.js"></script>
+<script src="copypaste.js"></script>
+</head>
+<body>
+<h1>WRTC Copy/Paste Test</h1>
+
+<section id="connection-establishment">
+<section id="offer-answer">
+<h2>Offers and Answers</h2>
+
+<p id="createoffer-p">
+<button id="createOffer">Create Offer</button>
+</p>
+
+<p id="recvoffer-p">
+Or paste an offer JSON in here and click.<br />
+<textarea id="recvoffertxt"></textarea><br />
+<button id="recvOffer">Receive Offer</button>
+</p>
+</section>
+
+<section id="ice">
+<h2>ICE Candidates</h2>
+
+<p id="localice-p">
+Local ICE Candidates (copy out of here)<br />
+<textarea id="localice"></textarea>
+</p>
+
+<p id="remoteice=p">
+Remote ICE Candidates (paste into here)<br />
+<textarea id="remoteice"></textarea><br />
+<button id="recvIce">Receive ICE Candidates</button>
+</p>
+</section>
+</section>
+
+<section id="msgs">
+</section>
+
+</body>
+</html>
