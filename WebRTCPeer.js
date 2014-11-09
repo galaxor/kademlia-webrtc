@@ -26,7 +26,7 @@ if (typeof require == "function") {
  * The constructor is where you can pass a bunch of the callbacks that make this run.
  * The args object has these members.
  *
- * sendOffer: function (peer, answer)
+ * sendOffer: function (peer, offer)
  *   This callback is called after an offer is created by the local side (as a
  *   result of a call to createOffer).  This callback must somehow send the
  *   offer to the remote side.
