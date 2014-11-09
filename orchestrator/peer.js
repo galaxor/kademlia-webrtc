@@ -13,6 +13,11 @@ function chanOpen(peerId) {
   $('#buddies').append("<option value=\""+peerId+"\">"+peerId+"</option>");
 }
 
+function chanClose(peerId) {
+  console.log("Channel with ",peerId,"closed.");
+  $('#buddies option[value="'+peerId+'"]').remove();
+}
+
 $('#send').click(function () {
   var to = $('#buddies').val();
   var msg = $('#msg').val();
@@ -69,6 +74,9 @@ ws.onmessage = function (event) {
             onMessage: function (peer, channel, msg) {
               console.log("Msg from", peerId, ":", msg);
             },
+            onClose: function (peer, channel) {
+              chanClose(peerId);
+            },
           },
         },
       });
@@ -104,6 +112,9 @@ ws.onmessage = function (event) {
           },
           onMessage: function (peer, channel, msg) {
             console.log("Msg from ", peerId, ":", msg);
+          },
+          onClose: function (peer, channel) {
+            chanClose(peerId);
           },
         },
       },
