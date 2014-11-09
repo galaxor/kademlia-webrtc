@@ -121,6 +121,9 @@ function WebRTCPeer (args) {
   // this to initiate communication or prepare to receive communication.
   this.dataChannelHandlers = {};
 
+  // These are fired when a data channel is closed.
+  this.dataChannelCloseHandlers = {};
+
   if (typeof args != "undefined" && typeof args.expectedDataChannels != "undefined") {
     this.addExpectedDataChannels(args.expectedDataChannels);
   }
@@ -483,6 +486,16 @@ WebRTCPeer.prototype._dataChannelOpen = function (channel) {
   }
 };
 
+WebRTCPeer.prototype._dataChannelClose = function (channel) {
+  var peer = this;
+  var label = channel.label;
+  if (typeof peer.dataChannelCloseHandlers[label] != "undefined") {
+    peer.dataChannelCloseHandlers[label].forEach(function (handler) {
+      handler(peer, channel);
+    });
+  }
+};
+
 WebRTCPeer.prototype._dataChannelMessage = function (channel, evt) {
   var peer = this;
   var data = evt.data;
@@ -528,9 +541,7 @@ WebRTCPeer.prototype._doCreateDataChannelCallback = function () {
 
     channel.onmessage = peer._dataChannelMessage.bind(peer, channel);
 
-    channel.onclose = function() {
-      console.info('onclose');
-    };
+    channel.onclose = peer._dataChannelClose.bind(peer, channel);
 
     channel.onerror = peer._doHandleError.bind(peer);
   };
@@ -579,11 +590,16 @@ WebRTCPeer.prototype.createDataChannel = function (label, channelOptions) {
   var peer = this;
 
   var onOpen = null;
+  var onClose = null;
   var onMessage = null;
 
   if (typeof channelOptions.onOpen != "undefined") {
     onOpen = channelOptions.onOpen;
     delete channelOptions.onOpen;
+  }
+  if (typeof channelOptions.onClose != "undefined") {
+    onClose = channelOptions.onClose;
+    delete channelOptions.onClose;
   }
   if (typeof channelOptions.onMessage != "undefined") {
     onMessage = channelOptions.onMessage;
@@ -596,15 +612,16 @@ WebRTCPeer.prototype.createDataChannel = function (label, channelOptions) {
   if (onOpen) {
     peer.addDataChannelHandler(label, onOpen);
   }
+  if (onClose) {
+    peer.addDataChannelCloseHandler(label, onClose);
+  }
   if (onMessage) {
     peer.addChannelMessageHandler(label, onMessage);
   }
   channel.onopen = peer._dataChannelOpen.bind(peer, channel);
+  channel.onclose = peer._dataChannelClose.bind(peer, channel);
   channel.onmessage = peer._dataChannelMessage.bind(peer, channel);
 
-  channel.onclose = function(event) {
-    console.info('onclose');
-  };
   channel.onerror = peer._doHandleError.bind(peer);
 };
 
@@ -654,6 +671,13 @@ WebRTCPeer.prototype.addDataChannelHandler = function (label, handler) {
     this.dataChannelHandlers[label] = [];
   }
   this.dataChannelHandlers[label].push(handler);
+};
+
+WebRTCPeer.prototype.addDataChannelCloseHandler = function (label, handler) {
+  if (typeof this.dataChannelCloseHandlers[label] == "undefined") {
+    this.dataChannelCloseHandlers[label] = [];
+  }
+  this.dataChannelCloseHandlers[label].push(handler);
 };
 
 WebRTCPeer.prototype.addDataChannelsOpenCallback = function (cb) {
