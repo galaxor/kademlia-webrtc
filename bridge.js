@@ -1,4 +1,4 @@
-var WebRTCPeer = require('./WebRTCPeer');
+var WebRTCPeer = require('WebRTCPeer');
 
 var static = require('node-static-alias');
 var http = require('http');

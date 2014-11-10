@@ -1,3 +1,6 @@
 [submodule "node_modules/wrtc"]
 	path = node_modules/wrtc
 	url = https://github.com/js-platform/node-webrtc.git
+[submodule "node_modules/WebRTCPeer"]
+	path = node_modules/WebRTCPeer
+	url = git@git.iheartryan.com:WebRTCPeer

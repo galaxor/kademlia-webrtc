@@ -8,11 +8,23 @@ var port = args.p || 8080;
 var socketPort = args.ws || 9001;
 
 var file = new static.Server('./', {
-    alias: {
+    alias: [
+      {
         match: '/dist/wrtc.js',
         serve: '../node_modules/wrtc/dist/wrtc.js',
         allowOutside: true
-      }
+      },
+      {
+        match: '/WebRTCPeer.js',
+        serve: '../node_modules/WebRTCPeer/WebRTCPeer.js',
+        allowOutside: true
+      },
+      {
+        match: '/jquery-1.11.1.min.js',
+        serve: '../jquery-1.11.1.min.js',
+        allowOutside: true
+      },
+    ],
     });
 
 var app = http.createServer(function (req, res) {
