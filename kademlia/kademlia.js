@@ -50,6 +50,13 @@ function KademliaDHT(options) {
     }
   }
 
+  if (this.id.length * 4 != this.B) {
+    throw new Error("The id length for the node ("+(this.id.length*4)+") is not the same as the id length for the network ("+this.B+").");
+  }
+
+  this.bitId = this._hex2BitStream(this.id);
+  
+
   // Initialize the buckets.
   this.buckets = new Array(this.B);
   for (var i=0; i<this.buckets.length; i++) {
@@ -69,6 +76,8 @@ KademliaDHT.prototype._hex2BitStream = function (hex) {
   // Allocate a buffer.  1 hex char == 4 bits, so the size of the buffer is 4x
   // the length of the string.
   var buf = new bitCoder.BitStream(hex.length*4);
+  buf.fillBits(0, hex.length*4);
+  buf.index=0;
 
   // 32-bit chunks.
   for (var i=0; i<hex.length; i+=8) {
@@ -90,17 +99,36 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
   for (b1.index=0, b2.index=0; b1.index < b1.view.length; ) {
     var chunk1 = b1.readBits(32);
     var chunk2 = b2.readBits(32);
-    if (chunk1 < chunk2) {
+
+    // Apparently, javascript has a '>>>' operator.  I'm not sure what it does,
+    // but it only works with unsigned numbers.  >>>'ing by 0 is a way to make
+    // sure the numbers are treated as unsigned.
+    if ((chunk1>>>0) < (chunk2>>>0)) {
       return 1;
-    } else if (chunk1 > chunk2) {
+    } else if ((chunk1>>>0) > (chunk2>>>0)) {
       return -1;
     }
   }
   return 0;
 }
 
-// var dht = new KademliaDHT('1234');
-// var b1 = dht._hex2BitStream('1234567812345678');
-// var b2 = dht._hex2BitStream('1234567812345678');
-// 
-// console.log(dht._bitCmp(b1, b2));
+KademliaDHT.prototype._findBucketIndex = function (key) {
+  var bucketMax = new bitCoder.BitStream(this.B);
+  bucketMax.fillBits(0, this.B);
+
+  for (var i=this.B-2; i>=0; i--) {
+    bucketMax.index = i;
+    console.log("Writing 2 bits at ", bucketMax.index);
+    bucketMax.writeBits(2, 2);
+    console.log("Compare", key);
+    console.log("with", bucketMax);
+    if (this._bitCmp(key, bucketMax) > 0) {
+      return i+1;
+    }
+  }
+  return 0;
+}
+
+var dht = new KademliaDHT({B: 256, id: '12345678'});
+var key = dht._hex2BitStream('00000000');
+console.log(dht._findBucketIndex(key));
