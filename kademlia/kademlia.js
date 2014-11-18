@@ -96,6 +96,11 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
     throw new Error("The operands are not the same size.");
   }
 
+  // Save the current indexes in the bitstreams.  Let's not change them.
+  var i1 = b1.index;
+  var i2 = b2.index;
+
+  var retval = 0;
   for (b1.index=0, b2.index=0; b1.index < b1.view.length; ) {
     var chunk1 = b1.readBits(32);
     var chunk2 = b2.readBits(32);
@@ -107,12 +112,47 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
     // If these numbers are treated as signed, then 0x80000000 < 0x00000000,
     // whereas we want the answer to be 0x80000000 > 0x00000000.
     if ((chunk1>>>0) < (chunk2>>>0)) {
-      return 1;
+      retval = 1;
+      break;
     } else if ((chunk1>>>0) > (chunk2>>>0)) {
-      return -1;
+      retval = -1;
+      break;
     }
   }
-  return 0;
+
+  // Restore the indexes in the bitstreams.
+  b1.index = i1;
+  b2.index = i2;
+  return retval;
+}
+
+KademliaDHT.prototype._xor = function (b1, b2) {
+  // If we were asked to xor bitstreams of unequal length, we'd have to pad
+  // the shorter one, and I don't feel like it.
+  if (b1.length != b2.length) {
+    throw new Error("The operands are not the same size.");
+  }
+
+  // Save the current indexes in the bitstreams.  Let's not change them.
+  var i1 = b1.index;
+  var i2 = b2.index;
+
+  var retval = new bitCoder.BitStream(b1.view.length);
+  retval.fillBits(0, b1.length);
+  retval.index = 0;
+
+  for (b1.index=0, b2.index=0; b1.index < b1.view.length; ) {
+    var chunk1 = b1.readBits(32);
+    var chunk2 = b2.readBits(32);
+
+    retval.writeBits(chunk1 ^ chunk2, 32);
+  }
+  retval.index = 0;
+
+  // Restore the indexes in the bitstreams.
+  b1.index = i1;
+  b2.index = i2;
+  return retval;
 }
 
 /**
@@ -133,6 +173,10 @@ KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
   return null;
 }
 
+KademliaDHT.prototype._findBucketIndex = function (key) {
+}
+
 var dht = new KademliaDHT({B: 32, id: '12345678'});
-var key = dht._hex2BitStream('40000000');
-console.log(dht._findNonzeroBitIndex(key));
+var b1 = dht._hex2BitStream('ff000000ff000000');
+var b2 = dht._hex2BitStream('f0000000f0000000');
+console.log(dht._xor(b1, b2));
