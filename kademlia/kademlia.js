@@ -100,9 +100,12 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
     var chunk1 = b1.readBits(32);
     var chunk2 = b2.readBits(32);
 
-    // Apparently, javascript has a '>>>' operator.  I'm not sure what it does,
-    // but it only works with unsigned numbers.  >>>'ing by 0 is a way to make
+    // Apparently, javascript has a '>>>' operator.  It's a zero-fill right
+    // shift, as opposed to the sign-propogating right shift '>>'.
+    // It works with unsigned numbers.  >>>'ing by 0 is a way to make
     // sure the numbers are treated as unsigned.
+    // If these numbers are treated as signed, then 0x80000000 < 0x00000000,
+    // whereas we want the answer to be 0x80000000 > 0x00000000.
     if ((chunk1>>>0) < (chunk2>>>0)) {
       return 1;
     } else if ((chunk1>>>0) > (chunk2>>>0)) {
@@ -112,23 +115,24 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
   return 0;
 }
 
-KademliaDHT.prototype._findBucketIndex = function (key) {
+/**
+ * Return the index of the first bit that is nonzero.
+ * Where the most significant bit is given the index 0.
+ */
+KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
   var bucketMax = new bitCoder.BitStream(this.B);
   bucketMax.fillBits(0, this.B);
 
   for (var i=this.B-2; i>=0; i--) {
     bucketMax.index = i;
-    console.log("Writing 2 bits at ", bucketMax.index);
     bucketMax.writeBits(2, 2);
-    console.log("Compare", key);
-    console.log("with", bucketMax);
     if (this._bitCmp(key, bucketMax) > 0) {
       return i+1;
     }
   }
-  return 0;
+  return null;
 }
 
-var dht = new KademliaDHT({B: 256, id: '12345678'});
-var key = dht._hex2BitStream('00000000');
-console.log(dht._findBucketIndex(key));
+var dht = new KademliaDHT({B: 32, id: '12345678'});
+var key = dht._hex2BitStream('40000000');
+console.log(dht._findNonzeroBitIndex(key));
