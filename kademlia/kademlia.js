@@ -102,8 +102,8 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
 
   var retval = 0;
   for (b1.index=0, b2.index=0; b1.index < b1.view.length; ) {
-    var chunk1 = b1.readBits(32);
-    var chunk2 = b2.readBits(32);
+    var chunk1 = b1.readBits(32) >>> 0;
+    var chunk2 = b2.readBits(32) >>> 0;
 
     // Apparently, javascript has a '>>>' operator.  It's a zero-fill right
     // shift, as opposed to the sign-propogating right shift '>>'.
@@ -111,6 +111,7 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
     // sure the numbers are treated as unsigned.
     // If these numbers are treated as signed, then 0x80000000 < 0x00000000,
     // whereas we want the answer to be 0x80000000 > 0x00000000.
+    console.log("Comparing ", chunk1, " with ", chunk2);
     if ((chunk1>>>0) < (chunk2>>>0)) {
       retval = 1;
       break;
@@ -157,26 +158,48 @@ KademliaDHT.prototype._xor = function (b1, b2) {
 
 /**
  * Return the index of the first bit that is nonzero.
- * Where the most significant bit is given the index 0.
+ * Where the least significant bit is given the index 0.
  */
 KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
+  var keyindex = key.index;
   var bucketMax = new bitCoder.BitStream(this.B);
   bucketMax.fillBits(0, this.B);
 
-  for (var i=this.B-2; i>=0; i--) {
-    bucketMax.index = i;
-    bucketMax.writeBits(2, 2);
-    if (this._bitCmp(key, bucketMax) > 0) {
-      return i+1;
+  // A special check for if it's zero.  If we don't have this, the logic below
+  // will try to write past the end of the bit array.
+  if (this._bitCmp(key, bucketMax) == 0) {
+    return null;
+  }
+
+  bucketMax.index = 0;
+  bucketMax.writeBits(1,1);
+  for (var i=this.B; i>0; i--) {
+    bucketMax.index = this.B - i;
+    console.log("Index: ", bucketMax.index);
+    console.log("BktMax ", bucketMax);
+    console.log("Key    ", key);
+    var cmp = this._bitCmp(key, bucketMax);
+    console.log("Ans: ", cmp);
+    if (this._bitCmp(key, bucketMax) <= 0) {
+      return i-1;
     }
+
+    // Move the bit over for the next run.
+    bucketMax.index = this.B - i;
+    bucketMax.writeBits(1, 2);
   }
   return null;
 }
 
+/**
+ * Find the index of the bucket that the key should go into.
+ */
 KademliaDHT.prototype._findBucketIndex = function (key) {
+  var distance = this._xor(key, this.bitId);
+  console.log("Dist:", distance);
+  return this._findNonzeroBitIndex(distance);
 }
 
 var dht = new KademliaDHT({B: 32, id: '12345678'});
-var b1 = dht._hex2BitStream('ff000000ff000000');
-var b2 = dht._hex2BitStream('f0000000f0000000');
-console.log(dht._xor(b1, b2));
+var b1 = dht._hex2BitStream('00000041');
+console.log(dht._findNonzeroBitIndex(b1));
