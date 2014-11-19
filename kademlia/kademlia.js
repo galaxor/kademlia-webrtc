@@ -191,10 +191,9 @@ KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
  */
 KademliaDHT.prototype._findBucketIndex = function (key) {
   var distance = this._xor(key, this.bitId);
-  console.log("Dist:", distance);
   return this._findNonzeroBitIndex(distance);
 }
 
-var dht = new KademliaDHT({B: 32, id: '12345678'});
-var b1 = dht._hex2BitStream('80000000');
-console.log(dht._findNonzeroBitIndex(b1));
+var dht = new KademliaDHT({B: 32, id: 'ffffffff'});
+var b1 = dht._hex2BitStream('fffffffa');
+console.log(dht._findBucketIndex(b1));
