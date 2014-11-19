@@ -111,7 +111,6 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
     // sure the numbers are treated as unsigned.
     // If these numbers are treated as signed, then 0x80000000 < 0x00000000,
     // whereas we want the answer to be 0x80000000 > 0x00000000.
-    console.log("Comparing ", chunk1, " with ", chunk2);
     if ((chunk1>>>0) < (chunk2>>>0)) {
       retval = 1;
       break;
@@ -175,11 +174,7 @@ KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
   bucketMax.writeBits(1,1);
   for (var i=this.B; i>0; i--) {
     bucketMax.index = this.B - i;
-    console.log("Index: ", bucketMax.index);
-    console.log("BktMax ", bucketMax);
-    console.log("Key    ", key);
     var cmp = this._bitCmp(key, bucketMax);
-    console.log("Ans: ", cmp);
     if (this._bitCmp(key, bucketMax) <= 0) {
       return i-1;
     }
@@ -201,5 +196,5 @@ KademliaDHT.prototype._findBucketIndex = function (key) {
 }
 
 var dht = new KademliaDHT({B: 32, id: '12345678'});
-var b1 = dht._hex2BitStream('00000041');
+var b1 = dht._hex2BitStream('80000000');
 console.log(dht._findNonzeroBitIndex(b1));
