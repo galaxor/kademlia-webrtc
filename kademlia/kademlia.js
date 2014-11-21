@@ -60,7 +60,10 @@ function KademliaDHT(options) {
   // Initialize the buckets.
   this.buckets = new Array(this.B);
   for (var i=0; i<this.buckets.length; i++) {
-    this.buckets[i] = new Array(this.k);
+    // this.buckets[i] will eventually have a maximum of this.k entries.
+    // We will not preallocate that as an array, though.  Instead, we will make it an object.
+    // The keys will be the hex representation of the network id.
+    this.buckets[i] = {};
   }
 }
 
@@ -87,6 +90,29 @@ KademliaDHT.prototype._hex2BitStream = function (hex) {
 
   buf.index = 0;
   return buf;
+}
+
+KademliaDHT.prototype._bitStream2Hex = function (buf) {
+  // If the number of bits is not a multiple of 32, I might have to pad the
+  // data, and I don't feel like it.
+  if (buf.view.length % 32 != 0) {
+    throw new Error("The size of the bitstream is not a multiple of 32 bits.");
+  }
+
+  var hex = '';
+
+  var bufIndex = buf.index;
+  buf.index = 0;
+
+  // 32-bit chunks.
+  for (var i=0; i<buf.view.length; i+=32) {
+    var chunk = buf.readBits(32) >>> 0;
+    hex += chunk.toString(16);
+  }
+
+  buf.index = bufIndex;
+  return hex;
+  
 }
 
 KademliaDHT.prototype._bitCmp = function (b1, b2) {
@@ -194,6 +220,72 @@ KademliaDHT.prototype._findBucketIndex = function (key) {
   return this._findNonzeroBitIndex(distance);
 }
 
-var dht = new KademliaDHT({B: 32, id: 'ffffffff'});
-var b1 = dht._hex2BitStream('fffffffa');
-console.log(dht._findBucketIndex(b1));
+/**
+ * Insert a node into the appropriate bucket.
+ * At this point, a node is an object:
+ * {id: <a node id, a string in hex>,
+ *  bitId: <the same node id, as a BitStream>,
+ *  peer: <A WebRTCPeer, which should have an open data channel>,
+ *  some statistics???
+ * }
+ * If prune is set, and is set to a true value, then we will prune the bucket
+ * we inserted into, making sure that it contains only the this.k best nodes.
+ */
+KademliaDHT.prototype._insertNode = function (node, prune) {
+  var bucketIndex = this._findBucketIndex(node.bitId);
+  this.buckets[bucketIndex][node.id] = node;
+
+  if (typeof prune != "undefined" && prune) {
+    this._pruneBucket(bucketIndex);
+  }
+}
+
+/**
+ * Prune a bucket.  Make sure it has at most the best this.k entries.
+ */
+KademliaDHT.prototype._pruneBucket = function (bucketIndex) {
+  var keys = Object.keys(this.buckets[bucketIndex]);
+  var nmemb = keys.length;
+  if (nmemb > this.k) {
+    for (var i=nmemb; i>this.k; i--) {
+      var pruneIndex = this._chooseNodeToPrune(this.buckets[bucketIndex]);
+      var pruneKey = keys[pruneIndex];
+      keys[pruneIndex] = keys[i-1];
+      delete this.buckets[bucketIndex][pruneKey];
+    }
+  }
+}
+
+/**
+ * Choose a node to prune out of the bucket.
+ * In standard kademlia, we would use some sort of "last contacted" metric to
+ * determine who was not a good node.
+ * I'm not sure we need that here, because with WebRTC, all our connections are
+ * guaranteed to be up and to have sent us keepalive packets (I think).  So we
+ * have nothing to recommend one node over another here.  Unless we come up
+ * with some other statistic, like RTT maybe.
+ * For now, just pick random ones to prune (if pruning is indeed needed).
+ */
+KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
+  var keys = Object.keys(bucket);
+  var pruneIndex = Math.floor(Math.random() * keys.length);
+  return pruneIndex;
+}
+
+var dht = new KademliaDHT({B: 32, id: '00000000'});
+var key1 = '80000001';
+
+for (var i=0; i<dht.k+5; i++) {
+  var b1  = dht._hex2BitStream(key1);
+  var node = {id: key1, bitId: b1, peer: null};
+
+  var key0 = (parseInt(key1, 16) + 1).toString(16);
+  for (key1 = ''; key1.length < 8-key0.length; key1 += '0') { }
+  key1 += key0;
+
+  dht._insertNode(node);
+}
+
+dht._pruneBucket(31);
+
+console.log(dht);
