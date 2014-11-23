@@ -65,6 +65,9 @@ function KademliaDHT(options) {
     // The keys will be the hex representation of the network id.
     this.buckets[i] = {};
   }
+
+  // The value store
+  this.values = {};
 }
 
 module.exports = exports = KademliaDHT;
@@ -251,6 +254,8 @@ KademliaDHT.prototype._pruneBucket = function (bucketIndex) {
       var pruneIndex = this._chooseNodeToPrune(this.buckets[bucketIndex]);
       var pruneKey = keys[pruneIndex];
       keys[pruneIndex] = keys[i-1];
+
+      this.buckets[bucketIndex][pruneKey].close();
       delete this.buckets[bucketIndex][pruneKey];
     }
   }
@@ -272,12 +277,25 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
   return pruneIndex;
 }
 
+function KademliaNode(args) {
+  var keys = Object.keys(args);
+  for (var i=0; i<keys.length; i++) {
+    this[keys[i]] = args[keys[i]];
+  }
+}
+
+KademliaNode.prototype.close = function () {
+  // We aren't really networked yet.  When we are, we will call:
+  // this.peer.close();
+};
+
+
 var dht = new KademliaDHT({B: 32, id: '00000000'});
 var key1 = '80000001';
 
 for (var i=0; i<dht.k+5; i++) {
   var b1  = dht._hex2BitStream(key1);
-  var node = {id: key1, bitId: b1, peer: null};
+  var node = new KademliaNode({id: key1, bitId: b1, peer: null});
 
   var key0 = (parseInt(key1, 16) + 1).toString(16);
   for (key1 = ''; key1.length < 8-key0.length; key1 += '0') { }
