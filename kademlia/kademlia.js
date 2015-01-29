@@ -21,6 +21,12 @@ var bitCoder = require('bit-coder');
  *               been accessed in this amount of time, refresh it.
  *    tReplicate - integer in seconds (default: 3600 [1hr]): After this amount
  *                 of time, a node must publish its entire database.
+ *    --
+ *    The parameters above are from the spec.  The ones below are
+ *    implementation details not in the spec.
+ *    findNodeTimeout - integer in msec (default: 500): After this amount of
+ *                      time, give up on a FIND_NODE search primitive and
+ *                      return whatever we've got so far.
  */
 function KademliaDHT(options) {
   var characteristics = {
@@ -31,6 +37,7 @@ function KademliaDHT(options) {
     tRepublish: 86400,
     tRefresh: 3600,
     tReplicate: 3600,
+    findNodeTimeout: 500,
     id: null,
   };
 
@@ -68,6 +75,12 @@ function KademliaDHT(options) {
 
   // The value store
   this.values = {};
+
+  // We need to keep a list of active searches, so that the callbacks and
+  // timeouts can accumulate a return value there.
+  // Also, to coordinate them, they'll have to have a serial number.
+  this.findNodeSearchSerial = 0;
+  this.findNodeSearches = {};
 }
 
 module.exports = exports = KademliaDHT;
@@ -93,7 +106,7 @@ KademliaDHT.prototype._hex2BitStream = function (hex) {
 
   buf.index = 0;
   return buf;
-}
+};
 
 KademliaDHT.prototype._bitStream2Hex = function (buf) {
   // If the number of bits is not a multiple of 32, I might have to pad the
@@ -115,8 +128,7 @@ KademliaDHT.prototype._bitStream2Hex = function (buf) {
 
   buf.index = bufIndex;
   return hex;
-  
-}
+};
 
 KademliaDHT.prototype._bitCmp = function (b1, b2) {
   // If we were asked to compare bitstreams of unequal length, we'd have to pad
@@ -153,7 +165,7 @@ KademliaDHT.prototype._bitCmp = function (b1, b2) {
   b1.index = i1;
   b2.index = i2;
   return retval;
-}
+};
 
 KademliaDHT.prototype._xor = function (b1, b2) {
   // If we were asked to xor bitstreams of unequal length, we'd have to pad
@@ -182,7 +194,7 @@ KademliaDHT.prototype._xor = function (b1, b2) {
   b1.index = i1;
   b2.index = i2;
   return retval;
-}
+};
 
 /**
  * Return the index of the first bit that is nonzero.
@@ -213,15 +225,16 @@ KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
     bucketMax.writeBits(1, 2);
   }
   return null;
-}
+};
 
 /**
  * Find the index of the bucket that the key should go into.
+ * @param key The BitStream key that we want to find a bucket for.
  */
 KademliaDHT.prototype._findBucketIndex = function (key) {
   var distance = this._xor(key, this.bitId);
   return this._findNonzeroBitIndex(distance);
-}
+};
 
 /**
  * Insert a node into the appropriate bucket.
@@ -241,7 +254,7 @@ KademliaDHT.prototype._insertNode = function (node, prune) {
   if (typeof prune != "undefined" && prune) {
     this._pruneBucket(bucketIndex);
   }
-}
+};
 
 /**
  * Prune a bucket.  Make sure it has at most the best this.k entries.
@@ -259,7 +272,7 @@ KademliaDHT.prototype._pruneBucket = function (bucketIndex) {
       delete this.buckets[bucketIndex][pruneKey];
     }
   }
-}
+};
 
 /**
  * Choose a node to prune out of the bucket.
@@ -275,35 +288,101 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
   var keys = Object.keys(bucket);
   var pruneIndex = Math.floor(Math.random() * keys.length);
   return pruneIndex;
-}
+};
 
-function KademliaNode(args) {
+/**
+ * The following functions are called by a callback function from one of the
+ * WebRTCPeer objects that this KademliaDHT owns.  (The KademliaDHT will own
+ * one WebRTCPeer object for each connection it has with a remote peer).
+ * Basically, the WebRTCPeer object watches the data channels for incoming RPC
+ * requests and then dispatches them to the KademliaDHT.
+ */
+
+/**
+ * Receive a FIND_NODE primitive request.  Set up a callback to pass the
+ * results to the caller.  The caller will be a KademliaRemoteNode object --
+ * the one that made the request.
+ * We've been passed a key to find, a number of offers from the remote node,
+ * and a reference to the remote node.
+ * We will search our buckets to come up with the k best matches.  For each of
+ * those matches, we will pass it one of the offers that the caller gave us.
+ * If we get an answer, we will put it on the list of responses to give back to
+ * the caller.  If we don't get an answer, don't bother refilling the bucket.
+ * But before we start the search, we will set up a hard deadline.  Once that
+ * deadline passes, we give up the search and just send whatever we have.
+ * To keep track of this all, we need the KademliaDHT object to keep a list of
+ * active FIND_NODE searches so that we can assemble a response there.  We'll
+ * need to come up with a serial number for each search, so that the timeout and
+ * the callbacks know where to look for the accumulating return value.
+ */
+KademliaDHT.prototype._recvFindNodePrimitive = function (findKey, offers, caller) {
+  var numReturn = 0;
+  var returnBucket = {};
+  var visited = new Array(this.k);
+  var bitFindKey = this._hex2BitStream(findKey);
+  var bucketIndex = this._findBucketIndex(bitFindKey);
+  
+  var searchId = this.findNodeSearchSerial++;
+  this.findNodeSearches[searchId] = [];
+
+  setTimeout(KademliaDHT.prototype._returnFindNodeSearch.bind(this, searchId, caller), this.findNodeTimeout);
+};
+
+KademliaDHT.prototype._returnFindNodeSearch = function (searchId, caller) {
+};
+
+
+/**
+ * A single Kademlia peer node.
+ */
+function KademliaRemoteNode(args) {
+  var defaults = {
+    // In contacting the remote side, give up after this many ms.
+    timeout: 1000,
+  };
+
+  // Set the defaults.
+  for (k in defaults) {
+    this[k] = defaults[k];
+  }
+
+  // Override defaults with args.
   var keys = Object.keys(args);
   for (var i=0; i<keys.length; i++) {
     this[keys[i]] = args[keys[i]];
   }
 }
 
-KademliaNode.prototype.close = function () {
+KademliaRemoteNode.prototype.close = function () {
   // We aren't really networked yet.  When we are, we will call:
   // this.peer.close();
 };
 
+KademliaRemoteNode.prototype.connect = function (callback) {
+  // this.peer.createOffer();
+};
 
+
+// I'm testing overfilling a bucket and then pruning it.
 var dht = new KademliaDHT({B: 32, id: '00000000'});
 var key1 = '80000001';
 
+// Insert nodes until the bucket is full.  Insert five more.
 for (var i=0; i<dht.k+5; i++) {
   var b1  = dht._hex2BitStream(key1);
-  var node = new KademliaNode({id: key1, bitId: b1, peer: null});
+  var node = new KademliaRemoteNode({id: key1, bitId: b1, peer: null});
 
+  // Add 1 to the key, so that the next key we create is 1 more.
   var key0 = (parseInt(key1, 16) + 1).toString(16);
+
+  // Zero-pad the string.
   for (key1 = ''; key1.length < 8-key0.length; key1 += '0') { }
   key1 += key0;
 
   dht._insertNode(node);
 }
 
+// Prune the bucket.
 dht._pruneBucket(31);
 
 console.log(dht);
