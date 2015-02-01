@@ -303,7 +303,7 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
  * results to the caller.  The caller will be a KademliaRemoteNode object --
  * the one that made the request.
  * We've been passed a key to find, a number of offers from the remote node,
- * and a reference to the remote node.
+ * and a callback to call once the return value is ready.
  * We will search our buckets to come up with the k best matches.  For each of
  * those matches, we will pass it one of the offers that the caller gave us.
  * If we get an answer, we will put it on the list of responses to give back to
@@ -315,7 +315,7 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
  * need to come up with a serial number for each search, so that the timeout and
  * the callbacks know where to look for the accumulating return value.
  */
-KademliaDHT.prototype._recvFindNodePrimitive = function (findKey, offers, caller) {
+KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnCallback) {
   var numReturn = 0;
   var returnBucket = {};
   var visited = new Array(this.k);
@@ -323,12 +323,44 @@ KademliaDHT.prototype._recvFindNodePrimitive = function (findKey, offers, caller
   var bucketIndex = this._findBucketIndex(bitFindKey);
   
   var searchId = this.findNodeSearchSerial++;
-  this.findNodeSearches[searchId] = [];
+  this.findNodeSearches[searchId] = {
+    offers: offers,
+    timeout: setTimeout(KademliaDHT.prototype._returnFindNodeSearch.bind(this, searchId, returnCallback), this.findNodeTimeout),
+    answers: [],
+  };
 
-  setTimeout(KademliaDHT.prototype._returnFindNodeSearch.bind(this, searchId, caller), this.findNodeTimeout);
+  // Find the nearest bucket.  For each node that's a member of that bucket,
+  // transmit an offer to them and register a callback that will add their
+  // answer to the return value of the search.
+  var bucketIndex = this._findBucketIndex(findKey);
+  var bucket = this.buckets[bucketIndex];
+  var bucketKeys = Object.keys(bucket);
+  for (var i=0; i<this.k && i < bucketKeys.length && this.findNodeSearches[searchId].offers.length > 0; i++) {
+    var key = bucketKeys[i];
+    var remoteNode = bucket[key];
+    var offer = this.findNodeSearches[searchId].offers.pop();
+    remoteNode.recvOffer(offer, this.prototype._recvAnswer.bind(this, searchId, returnCallback));
+  }
 };
 
-KademliaDHT.prototype._returnFindNodeSearch = function (searchId, caller) {
+/**
+ * Receive an answer from a remote node.  Put it in the accumulating return
+ * value.  If the return bucket is full, return it via the callback.
+ */
+KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, answer) {
+  this.findNodeSearches[searchId].answers.push(answer);
+  if (this.findNodeSearches[searchId].answers.length >= this.k) {
+    this._returnFindNodeSearch(searchId, returnCallback);
+  }
+};
+
+/**
+ * Send the accumulated return value back to the caller.
+ */
+KademliaDHT.prototype._returnFindNodeSearch = function (searchId, returnCallback) {
+  clearTimeout(this.findNodeSearches[searchId].timeout);
+  returnCallback(this.findNodeSearches[searchId].answers);
+  delete this.findNodeSearches[searchId];
 };
 
 
@@ -360,6 +392,10 @@ KademliaRemoteNode.prototype.close = function () {
 
 KademliaRemoteNode.prototype.connect = function (callback) {
   // this.peer.createOffer();
+};
+
+KademliaRemoteNode.prototype.recvOffer = function (offer, recvAnswerCallback) {
+  // XXX Get the offer that a remote node send.  Create an answer and send it back.
 };
 
 
