@@ -1,5 +1,6 @@
 var crypt = require('crypto-lite').crypto;
 var bitCoder = require('bit-coder');
+var setTimeout = require('timers').setTimeout;
 
 /**
  * Create a distributed hash table using the Kademlia protocol as specified here:
@@ -319,8 +320,6 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnC
   var numReturn = 0;
   var returnBucket = {};
   var visited = new Array(this.k);
-  var bitFindKey = this._hex2BitStream(findKey);
-  var bucketIndex = this._findBucketIndex(bitFindKey);
   
   var searchId = this.findNodeSearchSerial++;
   this.findNodeSearches[searchId] = {
@@ -332,7 +331,8 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnC
   // Find the nearest bucket.  For each node that's a member of that bucket,
   // transmit an offer to them and register a callback that will add their
   // answer to the return value of the search.
-  var bucketIndex = this._findBucketIndex(findKey);
+  var bitFindKey = this._hex2BitStream(findKey);
+  var bucketIndex = this._findBucketIndex(bitFindKey);
   var bucket = this.buckets[bucketIndex];
   var bucketKeys = Object.keys(bucket);
   for (var i=0; i<this.k && i < bucketKeys.length && this.findNodeSearches[searchId].offers.length > 0; i++) {
@@ -341,6 +341,9 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnC
     var offer = this.findNodeSearches[searchId].offers.pop();
     remoteNode.recvOffer(offer, this.prototype._recvAnswer.bind(this, searchId, returnCallback));
   }
+
+  // XXX If we did not fill the bucket, look at "nearby buckets".  The kademlia
+  // spec does not say how to find these nearby buckets.
 };
 
 /**
@@ -388,10 +391,6 @@ function KademliaRemoteNode(args) {
 KademliaRemoteNode.prototype.close = function () {
   // We aren't really networked yet.  When we are, we will call:
   // this.peer.close();
-};
-
-KademliaRemoteNode.prototype.connect = function (callback) {
-  // this.peer.createOffer();
 };
 
 KademliaRemoteNode.prototype.recvOffer = function (offer, recvAnswerCallback) {
