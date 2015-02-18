@@ -54,6 +54,22 @@ describe("KademliaDHT", function () {
 
   describe("#recvFindNodePrimitive", function () {
     it("should immediately return an empty bucket if there are no peers.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = answers;
+      };
+
+      dht.recvFindNodePrimitive('80000001', ['fake offer'], callbackFn);
+
+      assert.deepEqual(retVal, []);
+    });
+
+    it("should immediately return an empty bucket if there are no peers but the requestor.", function () {
       assert(0);
     });
 
@@ -80,7 +96,7 @@ describe("KademliaDHT", function () {
         retVal = answers;
       };
 
-      dht.recvFindNodePrimitive('00000001', ['fake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', ['fake offer'], callbackFn);
 
       // Let the time run out while we wait for answers.
       kademlia.mockTime.advance(600);

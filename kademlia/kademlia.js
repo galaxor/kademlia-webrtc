@@ -324,6 +324,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnC
   var searchId = this.findNodeSearchSerial++;
   this.findNodeSearches[searchId] = {
     offers: offers,
+    numOffers: offers.length,
     timeout: setTimeout(KademliaDHT.prototype._returnFindNodeSearch.bind(this, searchId, returnCallback), this.findNodeTimeout),
     answers: [],
   };
@@ -341,12 +342,12 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnC
     var key = bucketKeys[i];
     var remoteNode = bucket[key];
     var offer = this.findNodeSearches[searchId].offers.pop();
-    remoteNode.recvOffer(offer, this.prototype._recvAnswer.bind(this, searchId, returnCallback));
+    remoteNode.recvOffer(offer, this._recvAnswer.bind(this, searchId, returnCallback));
   }
 
   // If we did not actually send any offers, we can return immediately.
   // This would happen if we know of no peers.
-  if (this.findNodeSearches[searchId].offers.length == this.k) {
+  if (this.findNodeSearches[searchId].offers.length == this.findNodeSearches[searchId].numOffers) {
     this._returnFindNodeSearch(searchId, returnCallback);
   }
 
@@ -363,8 +364,7 @@ KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, answer) 
 
   // Figure out how many offers we sent.  If this answer is the last, we can
   // return immediately.
-  // We know that we initially received a number of offers equal to this.k.
-  var sentOffers = this.k - this.findNodeSearches[searchId].offers.length;
+  var sentOffers = this.findNodeSearches[searchId].numOffers - this.findNodeSearches[searchId].offers.length;
 
   // And how many answers do we have now?
   var recvdAnswers = this.findNodeSearches[searchId].answers.length;
