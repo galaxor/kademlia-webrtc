@@ -2,6 +2,22 @@ var assert = require('assert');
 var mock = require('mock');
 var mockTimer = require('time-mock');
 
+function mockTimedKademlia() {
+  var mockTime = mockTimer(0);
+
+  var kademlia = mock("../kademlia", {
+      timers: {
+        setTimeout: mockTime.setTimeout,
+      },
+    },
+    require
+  );
+
+  kademlia.mockTime = mockTime;
+
+  return kademlia;
+}
+
 describe("KademliaDHT", function () {
   // XXX test the different forms of the constructor.
 
@@ -41,16 +57,12 @@ describe("KademliaDHT", function () {
       assert(0);
     });
 
-    it("should return an empty bucket if nobody responds in time.", function () {
-      var mockTime = mockTimer(0);
+    it("should never contact the requesting node to fulfil its own request.", function () {
+      assert(0);
+    });
 
-      var kademlia = mock("../kademlia", {
-          timers: {
-            setTimeout: mockTime.setTimeout,
-          },
-        },
-        require
-      );
+    it("should return an empty bucket if nobody responds in time.", function () {
+      var kademlia = mockTimedKademlia();
 
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
@@ -71,7 +83,7 @@ describe("KademliaDHT", function () {
       dht.recvFindNodePrimitive('00000001', ['fake offer'], callbackFn);
 
       // Let the time run out while we wait for answers.
-      mockTime.advance(600);
+      kademlia.mockTime.advance(600);
       
       assert.deepEqual(retVal, []);
     });
