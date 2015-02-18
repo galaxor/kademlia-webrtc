@@ -336,10 +336,18 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnC
   var bucket = this.buckets[bucketIndex];
   var bucketKeys = Object.keys(bucket);
   for (var i=0; i<this.k && i < bucketKeys.length && this.findNodeSearches[searchId].offers.length > 0; i++) {
+    // XXX We have to make sure that the requestor never gets contacted in this
+    // search to respond to its own request.
     var key = bucketKeys[i];
     var remoteNode = bucket[key];
     var offer = this.findNodeSearches[searchId].offers.pop();
     remoteNode.recvOffer(offer, this.prototype._recvAnswer.bind(this, searchId, returnCallback));
+  }
+
+  // If we did not actually send any offers, we can return immediately.
+  // This would happen if we know of no peers.
+  if (this.findNodeSearches[searchId].offers.length == this.k) {
+    this._returnFindNodeSearch(searchId, returnCallback);
   }
 
   // XXX If we did not fill the bucket, look at "nearby buckets".  The kademlia
@@ -352,7 +360,16 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnC
  */
 KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, answer) {
   this.findNodeSearches[searchId].answers.push(answer);
-  if (this.findNodeSearches[searchId].answers.length >= this.k) {
+
+  // Figure out how many offers we sent.  If this answer is the last, we can
+  // return immediately.
+  // We know that we initially received a number of offers equal to this.k.
+  var sentOffers = this.k - this.findNodeSearches[searchId].offers.length;
+
+  // And how many answers do we have now?
+  var recvdAnswers = this.findNodeSearches[searchId].answers.length;
+
+  if (recvdAnswers >= this.k || recvdAnswers >= sentOffers) {
     this._returnFindNodeSearch(searchId, returnCallback);
   }
 };
