@@ -316,7 +316,7 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
  * need to come up with a serial number for each search, so that the timeout and
  * the callbacks know where to look for the accumulating return value.
  */
-KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnCallback) {
+KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, offers, returnCallback) {
   var numReturn = 0;
   var returnBucket = {};
   var visited = new Array(this.k);
@@ -341,8 +341,10 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, offers, returnC
     // search to respond to its own request.
     var key = bucketKeys[i];
     var remoteNode = bucket[key];
-    var offer = this.findNodeSearches[searchId].offers.pop();
-    remoteNode.recvOffer(offer, this._recvAnswer.bind(this, searchId, returnCallback));
+    if (remoteNode.id != requestorKey) { 
+      var offer = this.findNodeSearches[searchId].offers.pop();
+      remoteNode.recvOffer(offer, this._recvAnswer.bind(this, searchId, returnCallback));
+    }
   }
 
   // If we did not actually send any offers, we can return immediately.

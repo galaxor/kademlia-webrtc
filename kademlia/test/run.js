@@ -64,7 +64,7 @@ describe("KademliaDHT", function () {
         retVal = answers;
       };
 
-      dht.recvFindNodePrimitive('80000001', ['fake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer'], callbackFn);
 
       assert.deepEqual(retVal, []);
     });
@@ -96,7 +96,7 @@ describe("KademliaDHT", function () {
         retVal = answers;
       };
 
-      dht.recvFindNodePrimitive('80000001', ['fake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer'], callbackFn);
 
       // Let the time run out while we wait for answers.
       kademlia.mockTime.advance(600);
