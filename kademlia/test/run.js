@@ -108,11 +108,15 @@ describe("KademliaDHT", function () {
       assert(0);
     });
 
-    it("should return a partially-full bucket if there are not enough nodes to fill a bucket.", function () {
+    it("should return a partially-full bucket if there are not enough nodes to fill a bucket, and should return as soon as all nodes respond.", function () {
       assert(0);
     });
 
     it("should return a full bucket if there are enough nodes to fill a bucket.", function () {
+      assert(0);
+    });
+
+    it("should return a full bucket if there are more than enough nodes to fill a bucket.", function () {
       assert(0);
     });
 
