@@ -95,7 +95,41 @@ describe("KademliaDHT", function () {
     });
 
     it("should never contact the requesting node to fulfil its own request.", function () {
-      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+
+      var key1 = '80000001';
+      var b1   = dht._hex2BitStream(key1);
+      var callMeNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      callMeNode.recvOffer = function (offer, recvAnswerCallback) {
+        kademlia.mockTime.setTimeout(function () {
+          recvAnswerCallback('good call');
+        }, 10);
+      };
+      dht._insertNode(callMeNode);
+
+      var key2 = '80000002';
+      var b2   = dht._hex2BitStream(key2);
+      var dontCallNode = new kademlia.KademliaRemoteNode({id: key2, bitId: b2, peer: null});
+      dontCallNode.recvOffer = function (offer, recvAnswerCallback) {
+        kademlia.mockTime.setTimeout(function () {
+          recvAnswerCallback('bad call');
+        }, 10);
+      };
+      dht._insertNode(dontCallNode);
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = answers;
+      };
+
+      dht.recvFindNodePrimitive('80000001', '80000002', ['fake offer'], callbackFn);
+
+      kademlia.mockTime.advance(20);
+
+      assert.deepEqual(retVal, ['good call']);
     });
 
     it("should return an empty bucket if nobody responds in time.", function () {
