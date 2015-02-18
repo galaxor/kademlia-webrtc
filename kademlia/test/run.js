@@ -8,6 +8,7 @@ function mockTimedKademlia() {
   var kademlia = mock("../kademlia", {
       timers: {
         setTimeout: mockTime.setTimeout,
+        clearTimeout: mockTime.clearTimeout,
       },
     },
     require
@@ -70,7 +71,27 @@ describe("KademliaDHT", function () {
     });
 
     it("should immediately return an empty bucket if there are no peers but the requestor.", function () {
-      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+
+      var key1 = '80000001';
+      var b1   = dht._hex2BitStream(key1);
+      var node = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      // Replace the recvOffer function with one that will never call the return callback.
+      node.recvOffer = function (offer, recvAnswerCallback) {
+      };
+      dht._insertNode(node);
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = answers;
+      };
+
+      dht.recvFindNodePrimitive('80000001', '80000001', ['fake offer'], callbackFn);
+
+      assert.deepEqual(retVal, []);
     });
 
     it("should never contact the requesting node to fulfil its own request.", function () {

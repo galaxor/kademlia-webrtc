@@ -1,6 +1,8 @@
 var crypt = require('crypto-lite').crypto;
 var bitCoder = require('bit-coder');
-var setTimeout = require('timers').setTimeout;
+var timers = require('timers');
+var setTimeout = timers.setTimeout;
+var clearTimeout = timers.clearTimeout;
 
 /**
  * Create a distributed hash table using the Kademlia protocol as specified here:
