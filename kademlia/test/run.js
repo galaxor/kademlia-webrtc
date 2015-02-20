@@ -223,11 +223,90 @@ describe("KademliaDHT", function () {
     });
 
     it("should return a full bucket if there are enough nodes to fill a bucket.", function () {
-      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+
+      var keys = [
+        '20000001',
+        '20000002',
+        '20000003',
+        '20000004',
+      ];
+      for (var i=0; i<keys.length; i++) {
+        var key1 = keys[i];
+        var b1   = dht._hex2BitStream(key1);
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
+          var retKey = this.id;
+          kademlia.mockTime.setTimeout(function () {
+            recvAnswerCallback(retKey);
+          }, 10);
+        };
+        dht._insertNode(willRespondNode);
+      }
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = answers;
+      };
+
+      dht.recvFindNodePrimitive('20000001', '00000000', keys, callbackFn);
+
+      kademlia.mockTime.advance(20);
+
+      var retKeys = [
+        '20000001',
+        '20000002',
+        '20000003',
+        '20000004',
+      ];
+      assert.deepEqual(retVal.sort(), retKeys);
     });
 
     it("should return a full bucket if there are more than enough nodes to fill a bucket.", function () {
-      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+
+      var keys = [
+        '20000001',
+        '20000002',
+        '20000003',
+        '20000004',
+        '40000001',
+      ];
+      for (var i=0; i<keys.length; i++) {
+        var key1 = keys[i];
+        var b1   = dht._hex2BitStream(key1);
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
+          var retKey = this.id;
+          kademlia.mockTime.setTimeout(function () {
+            recvAnswerCallback(retKey);
+          }, 10);
+        };
+        dht._insertNode(willRespondNode);
+      }
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = answers;
+      };
+
+      dht.recvFindNodePrimitive('20000001', '00000000', keys, callbackFn);
+
+      kademlia.mockTime.advance(20);
+
+      var retKeys = [
+        '20000001',
+        '20000002',
+        '20000003',
+        '20000004',
+      ];
+      assert.deepEqual(retVal.sort(), retKeys);
     });
 
     it("should return a full bucket if you ask for more than a full bucket.", function () {
