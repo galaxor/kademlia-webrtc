@@ -279,6 +279,50 @@ describe("KademliaDHT", function () {
       assert.deepEqual(retVal.sort(), retKeys);
     });
 
+    it("should try more-specific buckets first when looking in nearby buckets.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+
+      var keys = [
+        '08000001',
+        '10000001',
+        '20000001',
+        '20000002',
+        '20000003',
+      ];
+      for (var i=0; i<keys.length; i++) {
+        var key1 = keys[i];
+        var b1   = dht._hex2BitStream(key1);
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
+          var retKey = this.id;
+          kademlia.mockTime.setTimeout(function () {
+            recvAnswerCallback(retKey);
+          }, 10);
+        };
+        dht._insertNode(willRespondNode);
+      }
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = answers;
+      };
+
+      dht.recvFindNodePrimitive('10000001', '00000000', keys, callbackFn);
+
+      kademlia.mockTime.advance(20);
+
+      var retKeys = [
+        '10000001',
+        '20000001',
+        '20000002',
+        '20000003',
+      ];
+      assert.deepEqual(retVal.sort(), retKeys);
+    });
+
     it("should try less-specific buckets second when looking in nearby buckets.", function () {
       var kademlia = mockTimedKademlia();
 
