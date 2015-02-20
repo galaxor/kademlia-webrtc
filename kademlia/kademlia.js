@@ -335,19 +335,27 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, o
   // transmit an offer to them and register a callback that will add their
   // answer to the return value of the search.
   var bitFindKey = this._hex2BitStream(findKey);
+
+  // If we're not full after the target bucket, loop to more-specific buckets
+  // and then start over from the top.
+  var nodesTouched=0;
+  var first = true;
   var bucketIndex = this._findBucketIndex(bitFindKey);
-  var bucket = this.buckets[bucketIndex];
-  var bucketKeys = Object.keys(bucket);
-  for (var i=0; i<this.k && i < bucketKeys.length && this.findNodeSearches[searchId].offers.length > 0; i++) {
-    // XXX We have to make sure that the requestor never gets contacted in this
-    // search to respond to its own request.
-    var key = bucketKeys[i];
-    var remoteNode = bucket[key];
-    if (remoteNode.id != requestorKey) { 
-      var offer = this.findNodeSearches[searchId].offers.pop();
-      remoteNode.recvOffer(offer, this._recvAnswer.bind(this, searchId, returnCallback));
+  var targetBucket = bucketIndex;
+  do {
+    var bucket = this.buckets[bucketIndex];
+    var bucketKeys = Object.keys(bucket);
+    for (var i=0; nodesTouched<this.k && i < bucketKeys.length && this.findNodeSearches[searchId].offers.length > 0; i++) {
+      var key = bucketKeys[i];
+      var remoteNode = bucket[key];
+      if (remoteNode.id != requestorKey) { 
+        var offer = this.findNodeSearches[searchId].offers.pop();
+        nodesTouched++;
+        remoteNode.recvOffer(offer, this._recvAnswer.bind(this, searchId, returnCallback));
+      }
     }
-  }
+    bucketIndex = (bucketIndex + 1) % this.B;
+  } while (bucketIndex != targetBucket);
 
   // If we did not actually send any offers, we can return immediately.
   // This would happen if we know of no peers.

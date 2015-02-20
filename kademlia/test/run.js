@@ -254,7 +254,6 @@ describe("KademliaDHT", function () {
         };
         dht._insertNode(willRespondNode);
       }
-      console.log(dht);
 
       var retVal = null;
 
