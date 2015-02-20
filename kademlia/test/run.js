@@ -125,7 +125,7 @@ describe("KademliaDHT", function () {
         retVal = answers;
       };
 
-      dht.recvFindNodePrimitive('80000001', '80000002', ['fake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '80000002', ['fake offer', 'flake offer'], callbackFn);
 
       kademlia.mockTime.advance(20);
 
