@@ -487,5 +487,43 @@ describe("KademliaDHT", function () {
       ];
       assert.deepEqual(retVal.sort(), retKeys);
     });
+
+    it("should not return if there is still a peer hanging.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+
+      var key1 = '80000001';
+      var b1   = dht._hex2BitStream(key1);
+      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
+        kademlia.mockTime.setTimeout(function () {
+          recvAnswerCallback('good call');
+        }, 10);
+      };
+      dht._insertNode(willRespondNode);
+
+      var key2 = '80000002';
+      var b2   = dht._hex2BitStream(key1);
+      var slowRespondNode = new kademlia.KademliaRemoteNode({id: key2, bitId: b2, peer: null});
+      slowRespondNode.recvOffer = function (offer, recvAnswerCallback) {
+        kademlia.mockTime.setTimeout(function () {
+          recvAnswerCallback('slow call');
+        }, 40);
+      };
+      dht._insertNode(slowRespondNode);
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = answers;
+      };
+
+      dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer', 'flake offer'], callbackFn);
+
+      kademlia.mockTime.advance(20);
+
+      assert.deepEqual(retVal, null);
+    });
   });
 });
