@@ -302,6 +302,8 @@ function KademliaRemoteNode(args) {
   for (var i=0; i<keys.length; i++) {
     this[keys[i]] = args[keys[i]];
   }
+
+  this.bitId = bitOps.hex2BitStream(this.id);
 }
 
 KademliaRemoteNode.prototype.close = function () {

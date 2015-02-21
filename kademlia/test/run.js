@@ -33,8 +33,7 @@ describe("KademliaDHT", function () {
 
       // Insert nodes until the bucket is full.  Insert five more.
       for (var i=0; i<dht.k+5; i++) {
-        var b1  = kademlia.bitOps.hex2BitStream(key1);
-        var node = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        var node = new kademlia.KademliaRemoteNode({id: key1, peer: null});
 
         // Add 1 to the key, so that the next key we create is 1 more.
         var key0 = (parseInt(key1, 16) + 1).toString(16);
@@ -76,8 +75,7 @@ describe("KademliaDHT", function () {
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
       var key1 = '80000001';
-      var b1   = kademlia.bitOps.hex2BitStream(key1);
-      var node = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      var node = new kademlia.KademliaRemoteNode({id: key1, peer: null});
       // Replace the recvOffer function with one that will never call the return callback.
       node.recvOffer = function (offer, recvAnswerCallback) {
       };
@@ -100,8 +98,7 @@ describe("KademliaDHT", function () {
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
       var key1 = '80000001';
-      var b1   = kademlia.bitOps.hex2BitStream(key1);
-      var callMeNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      var callMeNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
       callMeNode.recvOffer = function (offer, recvAnswerCallback) {
         kademlia.mockTime.setTimeout(function () {
           recvAnswerCallback('good call');
@@ -110,8 +107,7 @@ describe("KademliaDHT", function () {
       dht._insertNode(callMeNode);
 
       var key2 = '80000002';
-      var b2   = kademlia.bitOps.hex2BitStream(key2);
-      var dontCallNode = new kademlia.KademliaRemoteNode({id: key2, bitId: b2, peer: null});
+      var dontCallNode = new kademlia.KademliaRemoteNode({id: key2, peer: null});
       dontCallNode.recvOffer = function (offer, recvAnswerCallback) {
         kademlia.mockTime.setTimeout(function () {
           recvAnswerCallback('bad call');
@@ -138,8 +134,7 @@ describe("KademliaDHT", function () {
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
       var key1 = '80000001';
-      var b1   = kademlia.bitOps.hex2BitStream(key1);
-      var node = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      var node = new kademlia.KademliaRemoteNode({id: key1, peer: null});
       // Replace the recvOffer function with one that will never call the return callback.
       node.recvOffer = function (offer, recvAnswerCallback) {
       };
@@ -165,8 +160,7 @@ describe("KademliaDHT", function () {
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
       var key1 = '80000001';
-      var b1   = kademlia.bitOps.hex2BitStream(key1);
-      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
       willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
         kademlia.mockTime.setTimeout(function () {
           recvAnswerCallback('good call');
@@ -175,8 +169,7 @@ describe("KademliaDHT", function () {
       dht._insertNode(willRespondNode);
 
       var key2 = '80000002';
-      var b2   = kademlia.bitOps.hex2BitStream(key2);
-      var wontRespondNode = new kademlia.KademliaRemoteNode({id: key2, bitId: b2, peer: null});
+      var wontRespondNode = new kademlia.KademliaRemoteNode({id: key2, peer: null});
       wontRespondNode.recvOffer = function (offer, recvAnswerCallback) {
       };
       dht._insertNode(wontRespondNode);
@@ -200,8 +193,7 @@ describe("KademliaDHT", function () {
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
       var key1 = '80000001';
-      var b1   = kademlia.bitOps.hex2BitStream(key1);
-      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
       willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
         kademlia.mockTime.setTimeout(function () {
           recvAnswerCallback('good call');
@@ -235,8 +227,7 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var b1   = kademlia.bitOps.hex2BitStream(key1);
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
         willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
           var retKey = this.id;
           kademlia.mockTime.setTimeout(function () {
@@ -279,8 +270,7 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var b1   = kademlia.bitOps.hex2BitStream(key1);
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
         willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
           var retKey = this.id;
           kademlia.mockTime.setTimeout(function () {
@@ -324,8 +314,7 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var b1   = kademlia.bitOps.hex2BitStream(key1);
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
         willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
           var retKey = this.id;
           kademlia.mockTime.setTimeout(function () {
@@ -368,8 +357,7 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var b1   = kademlia.bitOps.hex2BitStream(key1);
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
         willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
           var retKey = this.id;
           kademlia.mockTime.setTimeout(function () {
@@ -413,8 +401,7 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var b1   = kademlia.bitOps.hex2BitStream(key1);
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
         willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
           var retKey = this.id;
           kademlia.mockTime.setTimeout(function () {
@@ -457,8 +444,7 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var b1   = kademlia.bitOps.hex2BitStream(key1);
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
         willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
           var retKey = this.id;
           kademlia.mockTime.setTimeout(function () {
@@ -494,8 +480,7 @@ describe("KademliaDHT", function () {
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
       var key1 = '80000001';
-      var b1   = kademlia.bitOps.hex2BitStream(key1);
-      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, bitId: b1, peer: null});
+      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
       willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
         kademlia.mockTime.setTimeout(function () {
           recvAnswerCallback('good call');
@@ -504,8 +489,7 @@ describe("KademliaDHT", function () {
       dht._insertNode(willRespondNode);
 
       var key2 = '80000002';
-      var b2   = kademlia.bitOps.hex2BitStream(key1);
-      var slowRespondNode = new kademlia.KademliaRemoteNode({id: key2, bitId: b2, peer: null});
+      var slowRespondNode = new kademlia.KademliaRemoteNode({id: key2, peer: null});
       slowRespondNode.recvOffer = function (offer, recvAnswerCallback) {
         kademlia.mockTime.setTimeout(function () {
           recvAnswerCallback('slow call');
