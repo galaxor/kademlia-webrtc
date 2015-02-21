@@ -64,7 +64,7 @@ function KademliaDHT(options) {
     throw new Error("The id length for the node ("+(this.id.length*4)+") is not the same as the id length for the network ("+this.B+").");
   }
 
-  this.bitId = this._hex2BitStream(this.id);
+  this.bitId = bitOps.hex2BitStream(this.id);
   
 
   // Initialize the buckets.
@@ -86,119 +86,6 @@ function KademliaDHT(options) {
   this.findNodeSearches = {};
 }
 
-module.exports = exports = KademliaDHT;
-
-KademliaDHT.prototype._hex2BitStream = function (hex) {
-  // If the number of bits is not a multiple of 32, I might have to pad the
-  // data, and I don't feel like it.
-  if (hex.length % 8) {
-    throw new Error("The size of the hex is not a multiple of 32 bits.");
-  }
-
-  // Allocate a buffer.  1 hex char == 4 bits, so the size of the buffer is 4x
-  // the length of the string.
-  var buf = new bitCoder.BitStream(hex.length*4);
-  buf.fillBits(0, hex.length*4);
-  buf.index=0;
-
-  // 32-bit chunks.
-  for (var i=0; i<hex.length; i+=8) {
-    var chunk = parseInt(hex.substr(i, 8), 16);
-    buf.writeBits(chunk, 32);
-  }
-
-  buf.index = 0;
-  return buf;
-};
-
-KademliaDHT.prototype._bitStream2Hex = function (buf) {
-  // If the number of bits is not a multiple of 32, I might have to pad the
-  // data, and I don't feel like it.
-  if (buf.view.length % 32 != 0) {
-    throw new Error("The size of the bitstream is not a multiple of 32 bits.");
-  }
-
-  var hex = '';
-
-  var bufIndex = buf.index;
-  buf.index = 0;
-
-  // 32-bit chunks.
-  for (var i=0; i<buf.view.length; i+=32) {
-    var chunk = buf.readBits(32) >>> 0;
-    hex += chunk.toString(16);
-  }
-
-  buf.index = bufIndex;
-  return hex;
-};
-
-KademliaDHT.prototype._bitCmp = function (b1, b2) {
-  // If we were asked to compare bitstreams of unequal length, we'd have to pad
-  // the shorter one, and I don't feel like it.
-  if (b1.length != b2.length) {
-    throw new Error("The operands are not the same size.");
-  }
-
-  // Save the current indexes in the bitstreams.  Let's not change them.
-  var i1 = b1.index;
-  var i2 = b2.index;
-
-  var retval = 0;
-  for (b1.index=0, b2.index=0; b1.index < b1.view.length; ) {
-    var chunk1 = b1.readBits(32) >>> 0;
-    var chunk2 = b2.readBits(32) >>> 0;
-
-    // Apparently, javascript has a '>>>' operator.  It's a zero-fill right
-    // shift, as opposed to the sign-propogating right shift '>>'.
-    // It works with unsigned numbers.  >>>'ing by 0 is a way to make
-    // sure the numbers are treated as unsigned.
-    // If these numbers are treated as signed, then 0x80000000 < 0x00000000,
-    // whereas we want the answer to be 0x80000000 > 0x00000000.
-    if ((chunk1>>>0) < (chunk2>>>0)) {
-      retval = 1;
-      break;
-    } else if ((chunk1>>>0) > (chunk2>>>0)) {
-      retval = -1;
-      break;
-    }
-  }
-
-  // Restore the indexes in the bitstreams.
-  b1.index = i1;
-  b2.index = i2;
-  return retval;
-};
-
-KademliaDHT.prototype._xor = function (b1, b2) {
-  // If we were asked to xor bitstreams of unequal length, we'd have to pad
-  // the shorter one, and I don't feel like it.
-  if (b1.length != b2.length) {
-    throw new Error("The operands are not the same size.");
-  }
-
-  // Save the current indexes in the bitstreams.  Let's not change them.
-  var i1 = b1.index;
-  var i2 = b2.index;
-
-  var retval = new bitCoder.BitStream(b1.view.length);
-  retval.fillBits(0, b1.length);
-  retval.index = 0;
-
-  for (b1.index=0, b2.index=0; b1.index < b1.view.length; ) {
-    var chunk1 = b1.readBits(32);
-    var chunk2 = b2.readBits(32);
-
-    retval.writeBits(chunk1 ^ chunk2, 32);
-  }
-  retval.index = 0;
-
-  // Restore the indexes in the bitstreams.
-  b1.index = i1;
-  b2.index = i2;
-  return retval;
-};
-
 /**
  * Return the index of the first bit that is nonzero.
  * Where the least significant bit is given the index 0.
@@ -210,7 +97,7 @@ KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
 
   // A special check for if it's zero.  If we don't have this, the logic below
   // will try to write past the end of the bit array.
-  if (this._bitCmp(key, bucketMax) == 0) {
+  if (bitOps.bitCmp(key, bucketMax) == 0) {
     return null;
   }
 
@@ -218,8 +105,8 @@ KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
   bucketMax.writeBits(1,1);
   for (var i=this.B; i>0; i--) {
     bucketMax.index = this.B - i;
-    var cmp = this._bitCmp(key, bucketMax);
-    if (this._bitCmp(key, bucketMax) <= 0) {
+    var cmp = bitOps.bitCmp(key, bucketMax);
+    if (bitOps.bitCmp(key, bucketMax) <= 0) {
       return i-1;
     }
 
@@ -235,7 +122,7 @@ KademliaDHT.prototype._findNonzeroBitIndex = function (key) {
  * @param key The BitStream key that we want to find a bucket for.
  */
 KademliaDHT.prototype._findBucketIndex = function (key) {
-  var distance = this._xor(key, this.bitId);
+  var distance = bitOps.xor(key, this.bitId);
   return this._findNonzeroBitIndex(distance);
 };
 
@@ -334,7 +221,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, o
   // Find the nearest bucket.  For each node that's a member of that bucket,
   // transmit an offer to them and register a callback that will add their
   // answer to the return value of the search.
-  var bitFindKey = this._hex2BitStream(findKey);
+  var bitFindKey = bitOps.hex2BitStream(findKey);
 
   // If we're not full after the target bucket, loop to more-specific buckets
   // and then start over from the top.
@@ -426,4 +313,120 @@ KademliaRemoteNode.prototype.recvOffer = function (offer, recvAnswerCallback) {
   // XXX Get the offer that a remote node send.  Create an answer and send it back.
 };
 
-module.exports = exports = {KademliaDHT: KademliaDHT, KademliaRemoteNode: KademliaRemoteNode};
+
+/**
+ * Bit operations that we use.
+ */
+var bitOps = {};
+bitOps.hex2BitStream = function (hex) {
+  // If the number of bits is not a multiple of 32, I might have to pad the
+  // data, and I don't feel like it.
+  if (hex.length % 8) {
+    throw new Error("The size of the hex is not a multiple of 32 bits.");
+  }
+
+  // Allocate a buffer.  1 hex char == 4 bits, so the size of the buffer is 4x
+  // the length of the string.
+  var buf = new bitCoder.BitStream(hex.length*4);
+  buf.fillBits(0, hex.length*4);
+  buf.index=0;
+
+  // 32-bit chunks.
+  for (var i=0; i<hex.length; i+=8) {
+    var chunk = parseInt(hex.substr(i, 8), 16);
+    buf.writeBits(chunk, 32);
+  }
+
+  buf.index = 0;
+  return buf;
+};
+
+bitOps.bitStream2Hex = function (buf) {
+  // If the number of bits is not a multiple of 32, I might have to pad the
+  // data, and I don't feel like it.
+  if (buf.view.length % 32 != 0) {
+    throw new Error("The size of the bitstream is not a multiple of 32 bits.");
+  }
+
+  var hex = '';
+
+  var bufIndex = buf.index;
+  buf.index = 0;
+
+  // 32-bit chunks.
+  for (var i=0; i<buf.view.length; i+=32) {
+    var chunk = buf.readBits(32) >>> 0;
+    hex += chunk.toString(16);
+  }
+
+  buf.index = bufIndex;
+  return hex;
+};
+
+bitOps.bitCmp = function (b1, b2) {
+  // If we were asked to compare bitstreams of unequal length, we'd have to pad
+  // the shorter one, and I don't feel like it.
+  if (b1.length != b2.length) {
+    throw new Error("The operands are not the same size.");
+  }
+
+  // Save the current indexes in the bitstreams.  Let's not change them.
+  var i1 = b1.index;
+  var i2 = b2.index;
+
+  var retval = 0;
+  for (b1.index=0, b2.index=0; b1.index < b1.view.length; ) {
+    var chunk1 = b1.readBits(32) >>> 0;
+    var chunk2 = b2.readBits(32) >>> 0;
+
+    // Apparently, javascript has a '>>>' operator.  It's a zero-fill right
+    // shift, as opposed to the sign-propogating right shift '>>'.
+    // It works with unsigned numbers.  >>>'ing by 0 is a way to make
+    // sure the numbers are treated as unsigned.
+    // If these numbers are treated as signed, then 0x80000000 < 0x00000000,
+    // whereas we want the answer to be 0x80000000 > 0x00000000.
+    if ((chunk1>>>0) < (chunk2>>>0)) {
+      retval = 1;
+      break;
+    } else if ((chunk1>>>0) > (chunk2>>>0)) {
+      retval = -1;
+      break;
+    }
+  }
+
+  // Restore the indexes in the bitstreams.
+  b1.index = i1;
+  b2.index = i2;
+  return retval;
+};
+
+bitOps.xor = function (b1, b2) {
+  // If we were asked to xor bitstreams of unequal length, we'd have to pad
+  // the shorter one, and I don't feel like it.
+  if (b1.length != b2.length) {
+    throw new Error("The operands are not the same size.");
+  }
+
+  // Save the current indexes in the bitstreams.  Let's not change them.
+  var i1 = b1.index;
+  var i2 = b2.index;
+
+  var retval = new bitCoder.BitStream(b1.view.length);
+  retval.fillBits(0, b1.length);
+  retval.index = 0;
+
+  for (b1.index=0, b2.index=0; b1.index < b1.view.length; ) {
+    var chunk1 = b1.readBits(32);
+    var chunk2 = b2.readBits(32);
+
+    retval.writeBits(chunk1 ^ chunk2, 32);
+  }
+  retval.index = 0;
+
+  // Restore the indexes in the bitstreams.
+  b1.index = i1;
+  b2.index = i2;
+  return retval;
+};
+
+module.exports = exports = {KademliaDHT: KademliaDHT, KademliaRemoteNode: KademliaRemoteNode, bitOps: bitOps};
