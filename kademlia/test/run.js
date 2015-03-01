@@ -19,6 +19,17 @@ function mockTimedKademlia(existingMockTime) {
   return kademlia;
 }
 
+function MockWebRTCPeer() {
+  this.sendlog = [];
+  this.recvlog = [];
+
+  this.remoteEnd = null;
+}
+MockWebRTCPeer.prototype.send = function (msg) {
+  this.log.push(msg);
+  this.remoteEnd.recv(msg);
+};
+
 describe("KademliaDHT", function () {
   // XXX test the different forms of the constructor.
 
@@ -517,10 +528,119 @@ describe("KademliaRemoteNode", function () {
     it("should send a well-formed FIND_NODE request over the wire.", function () {
       var kademlia = mockTimedKademlia();
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: '10000000', k: 4});
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
 
-      assert(0);
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+
+      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey});
+      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey});
+
+      alice._insertNode(bobAccordingToAlice);
+      bob._insertNode(aliceAccordingToBob);
+
+      bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
+        // Do nothing.  I'm just checking if I sent the right stuff.
+      });
+
+      kademlia.mockTime.advance(20);
+
+      assert.deepEqual(bobAccordingToAlice.peer.sendLog,
+        [{
+          op: 'FIND_NODE',
+          key: '00000000',
+          offers: [
+            bobAccordingToAlice.peer,
+            bobAccordingToAlice.peer,
+            bobAccordingToAlice.peer,
+            bobAccordingToAlice.peer,
+          ],
+        }]);
+    });
+
+    it("should receive a well-formed FIND_NODE request over the wire.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+
+      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey});
+      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey});
+
+      alice._insertNode(bobAccordingToAlice);
+      bob._insertNode(aliceAccordingToBob);
+
+      bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
+        // Do nothing.  I'm just checking if I sent the right stuff.
+      });
+
+      kademlia.mockTime.advance(20);
+
+      assert.deepEqual(aliceAccordingToBob.peer.recvLog,
+        [{
+          op: 'FIND_NODE',
+          key: '00000000',
+          offers: [
+            bobAccordingToAlice.peer,
+            bobAccordingToAlice.peer,
+            bobAccordingToAlice.peer,
+            bobAccordingToAlice.peer,
+          ],
+        }]);
+    });
+
+    it("should receive a bucket full of nodes in response.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+
+      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey});
+      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey});
+
+      alice._insertNode(bobAccordingToAlice);
+      bob._insertNode(aliceAccordingToBob);
+
+      // Fill in Bob with some other nodes.
+      var keys = [
+        '08000001',
+        '10000001',
+        '20000001',
+        '20000002',
+      ];
+      for (var i=0; i<keys.length; i++) {
+        var key1 = keys[i];
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
+        willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
+          var retKey = this.id;
+          kademlia.mockTime.setTimeout(function () {
+            recvAnswerCallback(retKey);
+          }, 10);
+        };
+        bob._insertNode(willRespondNode);
+      }
+
+      var recvAnswers = null;
+
+      bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
+        // Do nothing.  I'm just checking if I sent the right stuff.
+      });
+
+      kademlia.mockTime.advance(20);
+
+      assert.deepEqual(recvAnswers, [
+        '08000001',
+        '10000001',
+        '20000001',
+        '20000002',
+      ]);
     });
   });
 });
