@@ -30,7 +30,11 @@ wrtc.RTCPeerConnection.prototype.setRemoteDescription = function (sessionDescrip
 
   for (var label in this.remoteEnd.dataChannels) {
     if (typeof this.dataChannels[label] == "undefined") {
-      this.dataChannels[label] = new wrtc.RTCDataChannel(label);
+      this.dataChannels[label] = new wrtc.RTCDataChannel(label, peer);
+      if (typeof this.ondatachannel == "function") {
+        var event = {channel: this.dataChannels[label]};
+        this.ondatachannel(event);
+      }
     }
   }
 
@@ -38,6 +42,8 @@ wrtc.RTCPeerConnection.prototype.setRemoteDescription = function (sessionDescrip
     successCallback();
 
     peer.generateIceCandidate();
+
+    peer.openDataChannels();
   }, 0);
 };
 
@@ -63,9 +69,19 @@ wrtc.RTCPeerConnection.prototype.createAnswer = function (successCallback, failu
 wrtc.RTCPeerConnection.prototype.addIceCandidate = function (candidate) {
   if (!this.recvRemoteIce) {
     this.recvRemoteIce = true;
+    this.openDataChannels();
+  }
+};
+
+/**
+ * This is not part of WebRTC, I added this for the mock.
+ */
+wrtc.RTCPeerConnection.prototype.openDataChannels = function () {
+  if (this.remoteEnd != null && this.remoteEnd.recvRemoteIce) {
     // Open data channels.
     for (label in this.dataChannels) {
       this.dataChannels[label].open();
+      this.remoteEnd.dataChannels[label].open();
     }
   }
 };
@@ -107,11 +123,11 @@ wrtc.RTCIceCandidate = function (candidate) {
 wrtc.RTCDataChannel = function (label, peer) {
   this.label = label;
   this.peer = peer;
-  this.open = false;
+  this.isOpen = false;
 };
 
 wrtc.RTCDataChannel.prototype.send = function (msg) {
-  if (this.open) {
+  if (this.isOpen) {
     this.peer.remoteEnd.dataChannels[this.label].recv(msg);
   } else {
     throw new Error('data channel not open');
@@ -122,8 +138,8 @@ wrtc.RTCDataChannel.prototype.send = function (msg) {
  * This is not part of the WebRTC spec.  I invented this for the mock.
  */
 wrtc.RTCDataChannel.prototype.recv = function (msg) {
-  if (this.open) {
-    if (typeof this.onmessage = "function") {
+  if (this.isOpen) {
+    if (typeof this.onmessage == "function") {
       var event = {
         data: msg,
       };
@@ -138,9 +154,14 @@ wrtc.RTCDataChannel.prototype.recv = function (msg) {
  * This is not part of the WebRTC spec.  I invented this for the mock.
  */
 wrtc.RTCDataChannel.prototype.open = function () {
-  this.open = true;
-  if (typeof this.onopen == "function") {
-    this.onopen();
+  var chan = this;
+  if (!this.isOpen) {
+    this.isOpen = true;
+    if (typeof this.onopen == "function") {
+      setTimeout(function () {
+        chan.onopen();
+      }, 0);
+    }
   }
 };
 
