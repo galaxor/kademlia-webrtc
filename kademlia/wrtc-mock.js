@@ -18,12 +18,17 @@ wrtc.RTCPeerConnection = function (configuration, constraints) {
 
 wrtc.RTCPeerConnection.prototype.setLocalDescription = function (sessionDescription, successCallback, errorCallback) {
   this.localEnd = sessionDescription.endpoint;
+  setTimeout(function () {
+    successCallback();
+  }, 0);
 };
 
 wrtc.RTCPeerConnection.prototype.setRemoteDescription = function (sessionDescription, successCallback, errorCallback) {
+  var peer = this;
+
   this.remoteEnd = sessionDescription.endpoint;
 
-  for (var label in remoteEnd.dataChannels) {
+  for (var label in this.remoteEnd.dataChannels) {
     if (typeof this.dataChannels[label] == "undefined") {
       this.dataChannels[label] = new wrtc.RTCDataChannel(label);
     }
@@ -32,7 +37,7 @@ wrtc.RTCPeerConnection.prototype.setRemoteDescription = function (sessionDescrip
   setTimeout(function () {
     successCallback();
 
-    this.generateIceCandidate();
+    peer.generateIceCandidate();
   }, 0);
 };
 
@@ -46,10 +51,12 @@ wrtc.RTCPeerConnection.prototype.createOffer = function (successCallback, failur
 };
 
 wrtc.RTCPeerConnection.prototype.createAnswer = function (successCallback, failureCallback, constraints) {
-  successCallback(this);
+  var peer = this;
+
+  successCallback(peer);
 
   setTimeout(function () {
-    this.generateIceCandidate();
+    peer.generateIceCandidate();
   }, 0);
 };
 

@@ -16,7 +16,12 @@ var alice = new WebRTCPeer({
   },
   createDataChannels: {
     zapchan: {
-      onOpen: function () { console.log("alice's zapchan open"); },
+      onOpen: function (peer, channel) {
+        console.log("alice's zapchan open"); 
+        setTimeout(function () {
+          peer.send('zapchan', 'hello');
+        }, 1);
+      },
       onMessage: function (peer, channel, msg) { console.log('alice recved:', msg); },
     },
   },
@@ -32,7 +37,3 @@ var bob = new WebRTCPeer({
 });
 
 alice.createOffer();
-
-setTimeout(function () {
-  alice.send('zapchan', 'hello');
-}, 1);
