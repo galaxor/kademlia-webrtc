@@ -19,16 +19,71 @@ function mockTimedKademlia(existingMockTime) {
   return kademlia;
 }
 
-function MockWebRTCPeer() {
-  this.sendlog = [];
-  this.recvlog = [];
+describe("mock-wrtc", function () {
+  it("can simulate basic webrtc data channel behavior", function () {
+    var mockTime = mockTimer(0);
 
-  this.remoteEnd = null;
-}
-MockWebRTCPeer.prototype.send = function (msg) {
-  this.log.push(msg);
-  this.remoteEnd.recv(msg);
-};
+    var wrtc = mock('../wrtc-mock', {
+        timers: {
+          setTimeout: mockTime.setTimeout,
+          clearTimeout: mockTime.clearTimeout,
+        },
+      },
+      require
+    );
+
+    var WebRTCPeer = mock("WebRTCPeer", {
+        wrtc: wrtc,
+      },
+      require
+    );
+
+    var recvdMsg = null;
+
+    var alice = new WebRTCPeer({
+      name: 'alice',
+      sendOffer: function (peer, offer) {
+        bob.recvOffer(offer);
+      },
+      sendLocalIce: function (peer, iceCandidate) {
+        bob.recvRemoteIceCandidate(iceCandidate);
+      },
+      createDataChannels: {
+        zapchan: {
+          onOpen: function (peer, channel) {
+            mockTime.setTimeout(function () {
+              peer.send('zapchan', 'hello');
+            }, 1);
+          },
+          onMessage: function (peer, channel, msg) { },
+        },
+      },
+    });
+
+    var bob = new WebRTCPeer({
+      sendAnswer: function (peer, answer) {
+        alice.recvAnswer(answer);
+      },
+      sendLocalIce: function (peer, iceCandidate) {
+        alice.recvRemoteIceCandidate(iceCandidate);
+      },
+      expectedDataChannels: {
+        zapchan: {
+          onOpen: function (peer, channel) { },
+          onMessage: function (peer, channel, msg) { 
+            recvdMsg = msg; 
+          },
+        },
+      },
+    });
+
+    alice.createOffer();
+
+    mockTime.advance(10);
+
+    assert.equal(recvdMsg, 'hello');
+  });
+});
 
 describe("KademliaDHT", function () {
   // XXX test the different forms of the constructor.
