@@ -36,6 +36,8 @@ function mockTimedKademlia(existingMockTime) {
     require
   );
 
+  kademlia.wrtc = wrtc;
+
   kademlia.mockTime = mockTime;
 
   kademlia.makePair = makePair.bind(null, mockTime, WebRTCPeer);
@@ -650,7 +652,12 @@ describe("KademliaRemoteNode", function () {
         key: '00000000',
       }]);
 
-      // XXX now check the offers.
+      // 4 is the value of k for this network.
+      assert.equal(offers.length, 4);
+
+      for (var i=0; i<4; i++) {
+        offers[i] instanceof kademlia.wrtc.RTCPeerConnection;
+      }
     });
 
     it("should receive a well-formed FIND_NODE request over the wire.", function () {
