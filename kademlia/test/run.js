@@ -3,25 +3,12 @@ var mock = require('mock');
 var mockTimer = require('time-mock');
 
 function mockTimedKademlia(existingMockTime) {
-  mockTime = mockTimer(0);
+  var mockTime;
 
-  var kademlia = mock("../kademlia", {
-      timers: {
-        setTimeout: mockTime.setTimeout,
-        clearTimeout: mockTime.clearTimeout,
-      },
-    },
-    require
-  );
-
-  kademlia.mockTime = mockTime;
-
-  return kademlia;
-}
-
-function makePair(mockTime) {
-  if (typeof mockTime == "undefined") {
+  if (typeof existingMockTime == "undefined") {
     mockTime = mockTimer(0);
+  } else {
+    mockTime = existingMockTime;
   }
 
   var wrtc = mock('../wrtc-mock', {
@@ -33,12 +20,30 @@ function makePair(mockTime) {
     require
   );
 
-  var WebRTCPeer = mock("WebRTCPeer", {
+  var WebRTCPeer = mock('WebRTCPeer', {
       wrtc: wrtc,
     },
     require
   );
 
+  var kademlia = mock("../kademlia", {
+      timers: {
+        setTimeout: mockTime.setTimeout,
+        clearTimeout: mockTime.clearTimeout,
+      },
+      WebRTCPeer: WebRTCPeer,
+    },
+    require
+  );
+
+  kademlia.mockTime = mockTime;
+
+  kademlia.makePair = makePair.bind(null, mockTime, WebRTCPeer);
+
+  return kademlia;
+}
+
+function makePair(mockTime, WebRTCPeer) {
   var recvdMsg = null;
 
   var alice = new WebRTCPeer({
@@ -50,7 +55,7 @@ function makePair(mockTime) {
       bob.recvRemoteIceCandidate(iceCandidate);
     },
     createDataChannels: {
-      zapchan: {},
+      dht: {},
     },
   });
 
@@ -62,7 +67,7 @@ function makePair(mockTime) {
       alice.recvRemoteIceCandidate(iceCandidate);
     },
     expectedDataChannels: {
-      zapchan: {},
+      dht: {},
     },
   });
 
@@ -81,10 +86,10 @@ describe("mock-wrtc", function () {
   it("can simulate basic webrtc data behavior", function () {
     var participants = makePair();
     var recvdMsg = null;
-    participants.bob.addChannelMessageHandler('zapchan', function (peer, channel, data) {
+    participants.bob.addChannelMessageHandler('dht', function (peer, channel, data) {
       recvdMsg = data;
     });
-    participants.alice.send('zapchan', 'hello');
+    participants.alice.send('dht', 'hello');
 
     assert.equal(recvdMsg, 'hello');
   });
@@ -588,17 +593,39 @@ describe("KademliaRemoteNode", function () {
     it("should send a well-formed FIND_NODE request over the wire.", function () {
       var kademlia = mockTimedKademlia();
 
+      var participants = kademlia.makePair();
+
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey});
+      // In the participants object, I have things called 'alice' and 'bob'.
+      // What they mean is that alice has a connection to bob, so when alice
+      // sends something, bob gets it.
+      // Here, I have "bobAccordingToAlice".  This is an object belonging to
+      // the person of alice.  When you instruct it to send something, bob
+      // should get it.
+      // Therefore, bobAccordingToAlice should have participants.alice, and
+      // vice versa.
+      // That is, when we say "according to", that is the person we are.  They
+      // should possess the particpant named after them.
+      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
+      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
 
       alice._insertNode(bobAccordingToAlice);
       bob._insertNode(aliceAccordingToBob);
+
+      // Now actually start communication.
+      participants.alice.createOffer();
+      kademlia.mockTime.advance(5);
+
+      var bobLog = [];
+
+      participants.bob.addChannelMessageHandler('dht', function (peer, channel, data) {
+        bobLog.push(data);
+      });
 
       bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
         // Do nothing.  I'm just checking if I sent the right stuff.
@@ -606,14 +633,24 @@ describe("KademliaRemoteNode", function () {
 
       kademlia.mockTime.advance(20);
 
-      assert.deepEqual(bobAccordingToAlice.peer.sendLog,
-        [{
-          op: 'FIND_NODE',
-          key: '00000000',
-          offers: [
-            1,2,3,4,5
-          ],
-        }]);
+      // It should be like this:
+      // [{
+      //   op: 'FIND_NODE',
+      //   key: '00000000',
+      //   offers: [
+      //     five RTCPeerConnection objects.
+      //   ],
+      // }]);
+
+      var offers = bobLog[0].offers;
+      delete bobLog[0].offers;
+
+      assert.deepEqual(bobLog, [{
+        op: 'FIND_NODE',
+        key: '00000000',
+      }]);
+
+      // XXX now check the offers.
     });
 
     it("should receive a well-formed FIND_NODE request over the wire.", function () {

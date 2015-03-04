@@ -332,7 +332,7 @@ KademliaRemoteNode.prototype.recvOffer = function (offer, recvAnswerCallback) {
 
 /**
  * Create a bucket full of offers.
- * @param function callback Call this callback once the offers are created, with the signature callback(offers)
+ * @param function callback Call this callback once the offers are created, with the signature callback(offers, peers)
  */
 KademliaRemoteNode.prototype._makeOffers = function (callback) {
   var orchestrator = this.peer;
@@ -352,7 +352,7 @@ KademliaRemoteNode.prototype._makeOffers = function (callback) {
   for (var i=0; i<this.dht.k; i++) {
     var k = this.dht.k;
 
-    unsortedPeers.push(new WebRTCPeer({
+    var peer = new WebRTCPeer({
       sendOffer: function (peer, offer) {
         retOffers.push(offer);
         retPeers.push(peer);
@@ -389,11 +389,10 @@ KademliaRemoteNode.prototype._makeOffers = function (callback) {
           //   we define this function.
         },
       },
-    }));
+    });
+    unsortedPeers.push();
     peer.createOffer();
   }
-
-  callback(retBucket);
 };
 
 
