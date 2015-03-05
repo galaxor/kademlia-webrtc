@@ -551,7 +551,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       // Malformed.
       return;
     }
-    if (typeof data.offers != "array") {
+    if (!(data.offers instanceof Array)) {
       // Malformed.
       return;
     }

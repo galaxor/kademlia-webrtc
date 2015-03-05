@@ -730,15 +730,13 @@ describe("KademliaRemoteNode", function () {
 
       var response = null;
 
-      debugger;
       bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
-        debugger;
         response = answers;
       });
 
       kademlia.mockTime.advance(1000);
 
-      console.log(response);
+      assert.notEqual(response, null);
 
       assert.deepEqual(bobLog, [{
         op: 'FIND_NODE',
