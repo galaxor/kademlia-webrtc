@@ -215,6 +215,9 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
  * active FIND_NODE searches so that we can assemble a response there.  We'll
  * need to come up with a serial number for each search, so that the timeout and
  * the callbacks know where to look for the accumulating return value.
+ * The signature of the callback is returnCallback(answers).
+ * Here, answers is the responses that each node gave us.  We should be able to
+ * feed each one into a WebRTCPeer.recvAnswer().
  */
 KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, offers, returnCallback) {
   var numReturn = 0;
@@ -283,6 +286,9 @@ KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, answer) 
 
 /**
  * Send the accumulated return value back to the caller.
+ * The signature of the callback is returnCallback(answers).
+ * Here, answers is the responses that each node gave us.  We should be able to
+ * feed each one into a WebRTCPeer.recvAnswer().
  */
 KademliaDHT.prototype._returnFindNodeSearch = function (searchId, returnCallback) {
   clearTimeout(this.findNodeSearches[searchId].timeout);
@@ -436,9 +442,7 @@ KademliaRemoteNode.prototype.sendFindNodePrimitive = function (key, callback) {
  * @param array peers An array of WebRTCPeer objects.  We created these to make offers from.  In the FOUND_NODE message, each answer has an "idx".  That refers to the index of a peer in this array.
  * @param function callback Call this function once we've told each of the peers to recvAnswer.  The signature is callback({<hex key>:<a KademliaRemoteNode with communication open>, ...})
  */
-KademliaRemoteNode.prototype._recvFoundNode = function (searchedKey, peers, callback, msg) {
-  var answers = msg.answers;
-
+KademliaRemoteNode.prototype._recvFoundNode = function (searchedKey, peers, callback, answers) {
   // An object that will gather the accumulating peers.
   // We keep track of how many peers we have yet to hear from.  When that
   // reaches zero, we can send the reply to the callback.
@@ -546,7 +550,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // We don't have to check if there's any active listeners for FIND_NODE; we
     // will always respond to anyone's FIND_NODE request.
     // A FIND_NODE looks like this:
-    // {"op":"FIND_NODE", "key":<hex representation of key>, "offers":[k offers]}
+    // {"op":"FIND_NODE", "key":<hex representation of key to search for>, "offers":[k offers]}
     if (typeof data.key != "string") {
       // Malformed.
       return;
@@ -555,8 +559,11 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       // Malformed.
       return;
     }
-    var returnCallback = {}; // XXX
-    this.recvFindNodePrimitive(data.key, fromKey, data.offers, returnCallback);
+
+    // This function should make a FOUND_NODE message and send it across the wire.
+    // That looks like this: {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
+    var returnCallback = this.sendFoundNode.bind(this, fromKey, data.key);
+    this.dht.recvFindNodePrimitive(data.key, fromKey, data.offers, returnCallback);
     break;
   case 'FOUND_NODE':
     // We're interested in finding the function to call when we get the results
@@ -565,9 +572,13 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       // Malformed.
       return;
     }
+    if (!(data.answers instanceof Array)) {
+      // Malformed.
+      return;
+    }
 
     if (typeof this.listeners['FOUND_NODE'][data.key] == 'function') {
-      this.listeners['FOUND_NODE'][data.key]();
+      this.listeners['FOUND_NODE'][data.key](data.answers);
     }
     
     break;
@@ -580,6 +591,22 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
   // never get a response?
   // It will be the listeners' responsibility to set a timeout to give up and
   // remove those things.
+};
+
+/**
+ * This function should make a FOUND_NODE message and send it across the wire.
+ * That looks like this:
+ * {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}, ...]}
+ */
+KademliaRemoteNode.prototype.sendFoundNode = function (from, searchKey, answers) {
+  var msg = {
+    op: "FOUND_NODE",
+    key: searchKey,
+    answers: answers,
+  };
+
+  var recipient = this.dht.knownPeers[from];
+  recipient.peer.send('dht', msg);
 };
 
 
