@@ -691,6 +691,20 @@ describe("KademliaRemoteNode", function () {
       alice._insertNode(bobAccordingToAlice);
       bob._insertNode(aliceAccordingToBob);
 
+      var onMessage = function (peer, channel, data) {
+        remoteNode.onMessage(key, data);
+      };
+
+      // These handlers would normally be added as part of the kademlia
+      // process.  There will also be a process to add them when bootstrapping
+      // the network.  For now, I am bootstrapping by hand.
+      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+        bobAccordingToAlice.onMessage(bob.id, data);
+      });
+      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+        aliceAccordingToBob.onMessage(alice.id, data);
+      });
+
       // Now actually start communication.
       participants.alice.createOffer();
       kademlia.mockTime.advance(5);
@@ -716,11 +730,13 @@ describe("KademliaRemoteNode", function () {
 
       var response = null;
 
+      debugger;
       bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
+        debugger;
         response = answers;
       });
 
-      kademlia.mockTime.advance(20);
+      kademlia.mockTime.advance(1000);
 
       console.log(response);
 

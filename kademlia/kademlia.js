@@ -148,6 +148,7 @@ KademliaDHT.prototype._findBucketIndex = function (key) {
 KademliaDHT.prototype._insertNode = function (node, prune) {
   var bucketIndex = this._findBucketIndex(node.bitId);
   this.buckets[bucketIndex][node.id] = node;
+  this.knownPeers[node.id] = node;
 
   if (typeof prune != "undefined" && prune) {
     this._pruneBucket(bucketIndex);
@@ -493,10 +494,10 @@ KademliaRemoteNode.prototype._recvFoundNode = function (searchedKey, peers, call
 
         // This is a great time to add the onMessage callback!
         var onMessage = function (peer, channel, data) {
-          remoteNode.onMessage(data);
+          remoteNode.onMessage(key, data);
         };
 
-        remoteNode.addChannelMessageHandler(onMessage);
+        remoteNode.addChannelMessageHandler('dht', onMessage);
 
         replyPeers.awaitingReply--;
         if (replyPeers.awaitingReply <= 0) {
@@ -533,7 +534,7 @@ KademliaRemoteNode.prototype._recvFoundNode = function (searchedKey, peers, call
  * We will see if we've previously registered any listeners.  If we have, call them.
  * We will leave it up to the function we call to remove itself from the list, though.  Because maybe we wanted to receive multiple instances of that message.
  */
-KademliaRemoteNode.prototype.onMessage = function (data) {
+KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
   if (typeof data.op != "string") {
     // Malformed.  All well-formed messages will have an 'op' defined.
     return;
@@ -541,6 +542,22 @@ KademliaRemoteNode.prototype.onMessage = function (data) {
 
   // I'm going to be explicit about which messages we accept and how to process them.
   switch (data.op) {
+  case 'FIND_NODE':
+    // We don't have to check if there's any active listeners for FIND_NODE; we
+    // will always respond to anyone's FIND_NODE request.
+    // A FIND_NODE looks like this:
+    // {"op":"FIND_NODE", "key":<hex representation of key>, "offers":[k offers]}
+    if (typeof data.key != "string") {
+      // Malformed.
+      return;
+    }
+    if (typeof data.offers != "array") {
+      // Malformed.
+      return;
+    }
+    var returnCallback = {}; // XXX
+    this.recvFindNodePrimitive(data.key, fromKey, data.offers, returnCallback);
+    break;
   case 'FOUND_NODE':
     // We're interested in finding the function to call when we get the results
     // of a search for a particular key.  That key should be listed in the data here.
