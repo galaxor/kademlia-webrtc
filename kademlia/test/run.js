@@ -86,7 +86,11 @@ function makePair(mockTime, WebRTCPeer) {
 
 describe("mock-wrtc", function () {
   it("can simulate basic webrtc data behavior", function () {
-    var participants = makePair();
+    // We instantiate kademlia because that'll give us WebRTCPeer and timers
+    // all properly mocked.
+    var kademlia = mockTimedKademlia();
+    var participants = kademlia.makePair();
+
     var recvdMsg = null;
     participants.bob.addChannelMessageHandler('dht', function (peer, channel, data) {
       recvdMsg = data;
@@ -660,54 +664,36 @@ describe("KademliaRemoteNode", function () {
       }
     });
 
-    it("should receive a well-formed FIND_NODE request over the wire.", function () {
-      var kademlia = mockTimedKademlia();
-
-      var aliceKey = '00000000';
-      var bobKey   = '10000000';
-
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
-        // Do nothing.  I'm just checking if I sent the right stuff.
-      });
-
-      kademlia.mockTime.advance(20);
-
-      assert.deepEqual(aliceAccordingToBob.peer.recvLog,
-        [{
-          op: 'FIND_NODE',
-          key: '00000000',
-          offers: [
-            bobAccordingToAlice.peer,
-            bobAccordingToAlice.peer,
-            bobAccordingToAlice.peer,
-            bobAccordingToAlice.peer,
-          ],
-        }]);
-    });
-
     it("should receive a bucket full of nodes in response.", function () {
       var kademlia = mockTimedKademlia();
 
+      var participants = kademlia.makePair();
+
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey});
+      // In the participants object, I have things called 'alice' and 'bob'.
+      // What they mean is that alice has a connection to bob, so when alice
+      // sends something, bob gets it.
+      // Here, I have "bobAccordingToAlice".  This is an object belonging to
+      // the person of alice.  When you instruct it to send something, bob
+      // should get it.
+      // Therefore, bobAccordingToAlice should have participants.alice, and
+      // vice versa.
+      // That is, when we say "according to", that is the person we are.  They
+      // should possess the particpant named after them.
+      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
+      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
 
       alice._insertNode(bobAccordingToAlice);
       bob._insertNode(aliceAccordingToBob);
+
+      // Now actually start communication.
+      participants.alice.createOffer();
+      kademlia.mockTime.advance(5);
 
       // Fill in Bob with some other nodes.
       var keys = [
@@ -728,20 +714,27 @@ describe("KademliaRemoteNode", function () {
         bob._insertNode(willRespondNode);
       }
 
-      var recvAnswers = null;
+      var response = null;
 
       bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
-        // Do nothing.  I'm just checking if I sent the right stuff.
+        response = answers;
       });
 
       kademlia.mockTime.advance(20);
 
-      assert.deepEqual(recvAnswers, [
-        '08000001',
-        '10000001',
-        '20000001',
-        '20000002',
-      ]);
+      console.log(response);
+
+      assert.deepEqual(bobLog, [{
+        op: 'FIND_NODE',
+        key: '00000000',
+      }]);
+
+      // 4 is the value of k for this network.
+      assert.equal(offers.length, 4);
+
+      for (var i=0; i<4; i++) {
+        offers[i] instanceof kademlia.wrtc.RTCPeerConnection;
+      }
     });
   });
 });
