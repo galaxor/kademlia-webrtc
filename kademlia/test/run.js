@@ -764,7 +764,7 @@ describe("KademliaRemoteNode", function () {
         bobLog.push(data);
       });
 
-      bobAccordingToAlice.sendFindNodePrimitive('00000000', function (answers) {
+      bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (answers) {
         // Do nothing.  I'm just checking if I sent the right stuff.
       });
 
