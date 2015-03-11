@@ -456,11 +456,20 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
-        willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
-          var retKey = this.id;
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: {}});
+        willRespondNode.peer.node = willRespondNode;
+        willRespondNode.peer.send = function (chan, msg) {
+          var node = this.node;
+          var myId = this.node.id;
           kademlia.mockTime.setTimeout(function () {
-            recvAnswerCallback(retKey);
+            // This is what we would have sent.
+            // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+            if (chan == 'dht' && msg.op == 'offer') {
+              // Instead of sending to anybody, just call your own onMessage.
+              // This is what we will receive.
+              // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+            }
           }, 10);
         };
         dht._insertNode(willRespondNode);
@@ -469,7 +478,10 @@ describe("KademliaDHT", function () {
       var retVal = null;
 
       var callbackFn = function (answers) {
-        retVal = answers;
+        retVal = [];
+        for (var i=0; i<answers.length; i++) {
+          retVal.push(answers[i].answer);
+        }
       };
 
       dht.recvFindNodePrimitive('20000001', '00000000', keys, callbackFn);
@@ -499,11 +511,20 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
-        willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
-          var retKey = this.id;
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: {}});
+        willRespondNode.peer.node = willRespondNode;
+        willRespondNode.peer.send = function (chan, msg) {
+          var node = this.node;
+          var myId = this.node.id;
           kademlia.mockTime.setTimeout(function () {
-            recvAnswerCallback(retKey);
+            // This is what we would have sent.
+            // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+            if (chan == 'dht' && msg.op == 'offer') {
+              // Instead of sending to anybody, just call your own onMessage.
+              // This is what we will receive.
+              // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+            }
           }, 10);
         };
         dht._insertNode(willRespondNode);
@@ -512,7 +533,10 @@ describe("KademliaDHT", function () {
       var retVal = null;
 
       var callbackFn = function (answers) {
-        retVal = answers;
+        retVal = [];
+        for (var i=0; i<answers.length; i++) {
+          retVal.push(answers[i].answer);
+        }
       };
 
       dht.recvFindNodePrimitive('08000001', '00000000', keys, callbackFn);
@@ -543,11 +567,20 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
-        willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
-          var retKey = this.id;
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: {}});
+        willRespondNode.peer.node = willRespondNode;
+        willRespondNode.peer.send = function (chan, msg) {
+          var node = this.node;
+          var myId = this.node.id;
           kademlia.mockTime.setTimeout(function () {
-            recvAnswerCallback(retKey);
+            // This is what we would have sent.
+            // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+            if (chan == 'dht' && msg.op == 'offer') {
+              // Instead of sending to anybody, just call your own onMessage.
+              // This is what we will receive.
+              // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+            }
           }, 10);
         };
         dht._insertNode(willRespondNode);
@@ -556,7 +589,10 @@ describe("KademliaDHT", function () {
       var retVal = null;
 
       var callbackFn = function (answers) {
-        retVal = answers;
+        retVal = [];
+        for (var i=0; i<answers.length; i++) {
+          retVal.push(answers[i].answer);
+        }
       };
 
       var reqKeys = [1,2,3,4];
@@ -586,11 +622,20 @@ describe("KademliaDHT", function () {
       ];
       for (var i=0; i<keys.length; i++) {
         var key1 = keys[i];
-        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
-        willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
-          var retKey = this.id;
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: {}});
+        willRespondNode.peer.node = willRespondNode;
+        willRespondNode.peer.send = function (chan, msg) {
+          var node = this.node;
+          var myId = this.node.id;
           kademlia.mockTime.setTimeout(function () {
-            recvAnswerCallback(retKey);
+            // This is what we would have sent.
+            // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+            if (chan == 'dht' && msg.op == 'offer') {
+              // Instead of sending to anybody, just call your own onMessage.
+              // This is what we will receive.
+              // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+            }
           }, 10);
         };
         dht._insertNode(willRespondNode);
@@ -599,7 +644,10 @@ describe("KademliaDHT", function () {
       var retVal = null;
 
       var callbackFn = function (answers) {
-        retVal = answers;
+        retVal = [];
+        for (var i=0; i<answers.length; i++) {
+          retVal.push(answers[i].answer);
+        }
       };
 
       var reqKeys = [1,2,3,4];
@@ -622,19 +670,39 @@ describe("KademliaDHT", function () {
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
       var key1 = '80000001';
-      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
-      willRespondNode.recvOffer = function (offer, recvAnswerCallback) {
+      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: {}});
+      willRespondNode.peer.node = willRespondNode;
+      willRespondNode.peer.send = function (chan, msg) {
+        var node = this.node;
+        var myId = this.node.id;
         kademlia.mockTime.setTimeout(function () {
-          recvAnswerCallback('good call');
+          // This is what we would have sent.
+          // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+          if (chan == 'dht' && msg.op == 'offer') {
+            // Instead of sending to anybody, just call your own onMessage.
+            // This is what we will receive.
+            // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+            node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:'good call', idx:msg.idx});
+          }
         }, 10);
       };
       dht._insertNode(willRespondNode);
 
       var key2 = '80000002';
-      var slowRespondNode = new kademlia.KademliaRemoteNode({id: key2, peer: null});
-      slowRespondNode.recvOffer = function (offer, recvAnswerCallback) {
+      var slowRespondNode = new kademlia.KademliaRemoteNode({id: key2, peer: {}});
+      slowRespondNode.peer.node = slowRespondNode;
+      slowRespondNode.peer.send = function (chan, msg) {
+        var node = this.node;
+        var myId = this.node.id;
         kademlia.mockTime.setTimeout(function () {
-          recvAnswerCallback('slow call');
+          // This is what we would have sent.
+          // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+          if (chan == 'dht' && msg.op == 'offer') {
+            // Instead of sending to anybody, just call your own onMessage.
+            // This is what we slow receive.
+            // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+            node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:'slow call', idx:msg.idx});
+          }
         }, 40);
       };
       dht._insertNode(slowRespondNode);
@@ -642,7 +710,10 @@ describe("KademliaDHT", function () {
       var retVal = null;
 
       var callbackFn = function (answers) {
-        retVal = answers;
+        retVal = [];
+        for (var i=0; i<answers.length; i++) {
+          retVal.push(answers[i].answer);
+        }
       };
 
       dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer', 'flake offer'], callbackFn);
