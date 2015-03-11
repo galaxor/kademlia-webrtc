@@ -31,7 +31,7 @@ Bob finds a node (say Craig), and sends Craig
 The "idx" number is the array index from the original "offers" array.  So the first offer will be sent with idx=0, the second with idx=1, etc.  This is so that the sender can figure out which answers belong to which of the peers that were created.
 
 Craig sends Bob
-{"op":"answer", "to":<hex rep of Alice's key>, "key":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+{"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
 The idx number is repeated from above.
 and may also send some number of
 {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "idx":<idx>}

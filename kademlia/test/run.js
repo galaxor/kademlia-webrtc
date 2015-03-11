@@ -180,19 +180,33 @@ describe("KademliaDHT", function () {
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
 
       var key1 = '80000001';
-      var callMeNode = new kademlia.KademliaRemoteNode({id: key1, peer: null});
-      callMeNode.recvOffer = function (offer, recvAnswerCallback) {
+      var callMeNode = new kademlia.KademliaRemoteNode({id: key1, peer: {}});
+      callMeNode.peer.send = function (chan, msg) {
         kademlia.mockTime.setTimeout(function () {
-          recvAnswerCallback('good call');
+          // This is what we would have sent.
+          // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+          if (chan == 'dht' && msg.op == 'offer') {
+            // Instead of sending to anybody, just call your own onMessage.
+            // This is what we will receive.
+            // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+            callMeNode.onMessage(key1, {op: 'answer', to: msg.from, from: key1, answer:'good call', idx:msg.idx});
+          }
         }, 10);
       };
       dht._insertNode(callMeNode);
 
       var key2 = '80000002';
-      var dontCallNode = new kademlia.KademliaRemoteNode({id: key2, peer: null});
-      dontCallNode.recvOffer = function (offer, recvAnswerCallback) {
+      var dontCallNode = new kademlia.KademliaRemoteNode({id: key2, peer: {}});
+      dontCallNode.peer.send = function (chan, msg) {
         kademlia.mockTime.setTimeout(function () {
-          recvAnswerCallback('bad call');
+          // This is what we would have sent.
+          // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+          if (chan == 'dht' && msg.op == 'offer') {
+            // Instead of sending to anybody, just call your own onMessage.
+            // This is what we will receive.
+            // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+            dontCallNode.onMessage(key2, {op: 'answer', to: msg.from, from: key2, answer:'bad call', idx:msg.idx});
+          }
         }, 10);
       };
       dht._insertNode(dontCallNode);
@@ -200,7 +214,10 @@ describe("KademliaDHT", function () {
       var retVal = null;
 
       var callbackFn = function (answers) {
-        retVal = answers;
+        retVal = [];
+        for (var i=0; i<answers.length; i++) {
+          retVal.push(answers[i].answer);
+        }
       };
 
       dht.recvFindNodePrimitive('80000001', '80000002', ['fake offer', 'flake offer'], callbackFn);
