@@ -652,6 +652,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       return;
     }
 
+    debugger;
     if (typeof this.listeners['FOUND_NODE'][data.key] == 'function') {
       this.listeners['FOUND_NODE'][data.key](data.answers);
     } else {
