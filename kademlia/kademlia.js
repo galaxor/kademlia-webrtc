@@ -258,7 +258,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, o
       var key = bucketKeys[i];
       var remoteNode = bucket[key];
       if (remoteNode.id != requestorKey) { 
-        var idx = this.findNodeSearches[searchId].offers.length;
+        var idx = this.findNodeSearches[searchId].offers.length-1;
         var offer = this.findNodeSearches[searchId].offers.pop();
         nodesTouched++;
         remoteNode.asBob.sendOffer(findKey, offer, requestorKey, idx, this._recvAnswer.bind(this, searchId, returnCallback));
@@ -479,7 +479,7 @@ KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, callbac
   // get it, call the callback.
   var node = this.node;
   node.asAlice._makeOffers(function (offers, peers) {
-    node.listeners['FOUND_NODE'][key] = node.asAlice._recvFoundNode.bind(node, key, peers, callback);
+    node.listeners['FOUND_NODE'][key] = node.asAlice._recvFoundNode.bind(node.asAlice, key, peers, callback);
     node.peer.send('dht', {
       op: 'FIND_NODE',
       key: key,
@@ -632,7 +632,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // The returnCallback function should make a FOUND_NODE message and send it
     // across the wire.
     // That looks like this: {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
-    var returnCallback = this.node.asBob.sendFoundNode.bind(this, fromKey, data.key);
+    var returnCallback = this.asBob.sendFoundNode.bind(this.asBob, fromKey, data.key);
     this.dht.recvFindNodePrimitive(data.key, fromKey, data.offers, returnCallback);
     break;
   case 'FOUND_NODE':
@@ -652,7 +652,6 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       return;
     }
 
-    debugger;
     if (typeof this.listeners['FOUND_NODE'][data.key] == 'function') {
       this.listeners['FOUND_NODE'][data.key](data.answers);
     } else {
