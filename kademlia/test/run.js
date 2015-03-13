@@ -795,7 +795,7 @@ describe("KademliaRemoteNode", function () {
       }
     });
 
-    it("should receive a bucket full of nodes in response.", function () {
+    it("should receive a bucket full of answers in response.", function () {
       var kademlia = mockTimedKademlia();
 
       var participants = kademlia.makePair();
