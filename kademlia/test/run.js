@@ -866,24 +866,18 @@ describe("KademliaRemoteNode", function () {
 
       var response = null;
 
-      bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (answers) {
-        response = [];
-        for (var i=0; i<answers.length; i++) {
-          response.push(answers[i].answer);
-        }
+      bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        response = craigs;
       });
 
       kademlia.mockTime.advance(1000);
 
       assert.notEqual(response, null);
 
-      assert.deepEqual(bobLog, [{
-        op: 'FIND_NODE',
-        key: '00000000',
-      }]);
+      console.log(response);
 
       // 4 is the value of k for this network.
-      assert.equal(offers.length, 4);
+      assert.equal(response.length, 4);
 
       for (var i=0; i<4; i++) {
         offers[i] instanceof kademlia.wrtc.RTCPeerConnection;

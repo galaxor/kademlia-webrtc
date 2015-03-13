@@ -360,7 +360,23 @@ function KademliaRemoteNode(args) {
 
 KademliaRemoteNodeAlice = function (node) { this.node = node; };
 KademliaRemoteNodeBob = function (node) { this.node = node; };
-KademliaRemoteNodeCraig = function (node) { this.node = node; };
+KademliaRemoteNodeCraig = function (node) {
+  this.node = node; 
+
+  // If we've gotten an offer from someone, we create a WebRTCPeer and create
+  // an answer and wait for the channel to open.  If we don't hear back in this
+  // many msec, we can give up on hearing from them.
+  this.pendingPeerTimeout = 5000;
+
+  // If we've gotten an offer from someone, we create a WebRTCPeer and create
+  // an answer and wait for the channel to open.  While we wait, we need to
+  // keep this WebRTCPeer somewhere so it doesn't get garbage collected.  Also,
+  // we can set a timeout and give up on hearing from them if they don't
+  // respond in time.
+  // Therefore, the structure of this is: {<key>: {peer:<peer>, timeout:<timeout ID>}, ...}
+  // We save the timeout id so that we can remove it if the channel does open in time.
+  this.pendingPeers = {};
+};
 
 KademliaRemoteNode.prototype.close = function () {
   // We aren't really networked yet.  When we are, we will call:
@@ -402,8 +418,6 @@ KademliaRemoteNodeBob.prototype.sendOffer = function (findKey, offer, aliceKey, 
  * @param function callback Call this callback once the offers are created, with the signature callback(offers, peers).  This is an anonymous function created in KademliaRemoteNode.prototype.Alice.sendFindNodePrimitive.
  */
 KademliaRemoteNodeAlice.prototype._makeOffers = function (callback) {
-  var orchestrator = this.node.dht.peer;
-
   var retOffers = [];
   var retPeers = [];
 
@@ -430,9 +444,8 @@ KademliaRemoteNodeAlice.prototype._makeOffers = function (callback) {
       },
 
       // sendLocalIce: We will set this to a function that sends the ICE
-      //   candidate to the remote side (through the orchestrator).  We have to
-      //   wait until we know the Kademlia ID of the remote side before we can
-      //   create this function.
+      //   candidate to Craig (through Bob).  We have to wait until we know 
+      //   Craig's Kademlia ID before we can create this function.
 
       createDataChannels: {
         dht: {
@@ -441,7 +454,7 @@ KademliaRemoteNodeAlice.prototype._makeOffers = function (callback) {
           // onOpen: We will set this to a function that makes a
           //   KademliaRemoteNode from this WebRTCPeer and adds it to an
           //   accumulating set of KademliaRemoteNodes to return.
-          //   We need to wait until we know the key of the remote node before
+          //   We need to wait until we know Craig's key before
           //   we define this function.
 
           // onMessage: We will set up a function that looks at the
@@ -696,7 +709,18 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
   case 'offer':
     // Here, we act as Craig.  We've been sent an offer.  We make an answer and
     // send it back.
-    // XXX
+    // Bob sent us an offer like this:
+    // {"op":"offer", "from":<hex representation of Alice's id>, "offer":<offer>, "idx":<a number>}
+    // Our goal is to send back an answer like this:
+    // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+    // We will also add Alice to Craig's buckets.
+
+    if (typeof data.from != "string" || typeof data.idx != "number" || typeof data.offer == "undefined") {
+      // Malformed.
+      return;
+    }
+
+    this.asCraig.recvOffer(data.from, data.offer, data.idx, this.asCraig.sendAnswer.bind(this.asCraig, data.from, data.idx));
     break;
   }
 
@@ -725,6 +749,112 @@ KademliaRemoteNodeBob.prototype.sendFoundNode = function (from, searchKey, answe
 
   var recipient = this.node.dht.knownPeers[from];
   recipient.peer.send('dht', msg);
+};
+
+/**
+ * Receive an offer and create an answer.
+ * We will send this answer along to Bob to forward to Alice.  We expect that
+ * Alice will open communication later.  When they do, we will add Alice to our
+ * buckets.
+ * @param string aliceKey The hex representation of Alice's key.
+ * @param object offer An offer from Alice, suitable for passing to WebRTCPeer.recvOffer.
+ * @param function sendAnswerCallback The callback is
+ *   KademliaRemoteNodeCraig.prototype.sendAnswer(aliceKey, idx, answer), but the
+ *   first two args have been curried, so we only need to send
+ *   answer.  The answer should be an answer suitable for a WebRTCPeer.recvAnswer.
+ */
+KademliaRemoteNodeCraig.prototype.recvOffer = function (aliceKey, offer, idx, sendAnswerCallback) {
+  var craig = this;
+  var bob = this.node.peer;
+
+  var peer = new WebRTCPeer({
+    sendAnswer: function (peer, answer) {
+      // We need to store this peer somewhere so it doesn't go away.  onOpen,
+      // bring it out of there and put it in a bucket.
+      // Also, we register a timeout after which we will give up on this pending peer.
+
+      this.pendingPeers[aliceKey] = {
+        peer: peer,
+        timeout: setTimeout(craig.abandonPendingPeer.bind(craig, aliceKey), craig.pendingPeerTimeout),
+      };
+
+      sendAnswerCallback(answer);
+    },
+
+    sendLocalIce: function (peer, iceCandidate) {
+      // The message to Bob looks like this:
+      // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "idx":<idx>}
+      bob.peer.send('dht', {
+        op: 'ICECandidate',
+        from: craig.node.id,
+        to: aliceKey,
+        candidate: candidate,
+        idx: idx,
+      });
+    },
+
+    expectedDataChannels: {
+      dht: {
+        // onOpen: We will set this to a function that removes the WebRTCPeer
+        //   from the pendingPeers, cancels the abandonment timeout, creates a
+        //   KademliaRemoteNode, and adds it to the buckets.
+        //   That function is:
+        //   KademliaRemoteNodeCraig.onDataChannelOpen(aliceKey, peer, channel).
+        onOpen: craig.onDataChannelOpen.bind(craig, aliceKey),
+
+        // onMessage: We will set up a function that looks at the
+        //   KademliaRemoteNode.listeners property.  We will have to wait to
+        //   create this function until we create the KademliaRemoteNode for
+        //   this.
+
+        // onClose: We will set this to a function that removes this
+        //   KademliaRemoteNode from the KademliaDHT's list of known peers, and
+        //   from the bucket.  We will wait until we have actually
+        //   constructed a KademliaRemoteNode and added it to the DHT before
+        //   we define this function.
+      },
+    },
+  });
+};
+
+/**
+ * Removes the WebRTCPeer from the pendingPeers, cancel the abandonment
+ * timeout, create a KademliaRemoteNode, and add it to the buckets.
+ */
+KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, channel) {
+  clearTimeout(this.pendingPeers[aliceKey].timeout);
+  delete this.pendingPeers[aliceKey];
+
+  // Create a KademliaRemoteNode for the newcomer.
+  var alice = new KademliaRemoteNode({
+    id: aliceKey,
+    peer: peer,
+  });
+
+  // Set the onMessage handler.
+  var onMessage = function (peer, channel, data) {
+    alice.onMessage(aliceKey, data);
+  };
+
+  peer.addChannelMessageHandler('dht', onMessage);
+
+  // XXX Set the onClose handler.
+
+  // Add the newcomer to the buckets.
+  // XXX What if the bucket is full?  Are we sure we want to keep this node and
+  // not another one?  If we were gonna not accept this node, perhaps we
+  // shoulda informed Alice before we promised to talk to them.  For now, we
+  // will punt this decision to the normal _insertNode mechanisms, which will
+  // call _chooseNodeToPrune.
+  this.node.dht._insertNode(alice, true);
+};
+
+/**
+ * We sent an answer and waited for Alice to open the channel.  That did not
+ * happen after this.pendingPeerTimeout msec, so we will give up.
+ */
+KademliaRemoteNodeCraig.prototype.abandonPendingPeer = function (aliceKey) {
+  delete this.pendingPeers[aliceKey];
 };
 
 
