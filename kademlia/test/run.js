@@ -866,22 +866,35 @@ describe("KademliaRemoteNode", function () {
 
       var response = null;
 
+      // We won't be getting real answers, so we won't be able to actually feed them in to WebRTCPeer.recvAnswer.  Therefore, we will replace _recvFoundNode and use it to 
+      bobAccordingToAlice.asAlice._recvFoundNode = function (searchedKey, peers, callback, answers) {
+        response = [];
+        for (var i=0; i<answers.length; i++) {
+          response.push(answers[i].answer);
+        }
+      };
+
       bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
-        response = craigs;
+        // We shouldn't get here because this callback is normally called by
+        // _recvFoundNode, but we've replaced that.
+        assert(0 == "This shouldn't have been called");
       });
 
       kademlia.mockTime.advance(1000);
 
       assert.notEqual(response, null);
 
-      console.log(response);
-
       // 4 is the value of k for this network.
       assert.equal(response.length, 4);
 
-      for (var i=0; i<4; i++) {
-        offers[i] instanceof kademlia.wrtc.RTCPeerConnection;
-      }
+      var ansKeys = [
+        '08000001',
+        '10000001',
+        '20000001',
+        '20000002',
+      ];
+
+      assert.deepEqual(response.sort(), ansKeys);
     });
   });
 });
