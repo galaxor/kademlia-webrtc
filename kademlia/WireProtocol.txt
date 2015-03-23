@@ -26,15 +26,15 @@ Alice sends Bob
 {"op":"FIND_NODE", "key":<hex representation of key Alice is searching for>, "offers":[k offers]}
 
 Bob finds a node (say Craig), and sends Craig
-{"op":"offer", "from":<hex representation of Alice's id>, "offer":<offer>, "idx":<a number>}
+{"op":"offer", "from":<hex representation of Alice's id>, "offer":<offer>, "searchKey":<hex rep of the key Alice is searching for>, "idx":<a number>}
 
-The "idx" number is the array index from the original "offers" array.  So the first offer will be sent with idx=0, the second with idx=1, etc.  This is so that the sender can figure out which answers belong to which of the peers that were created.
+The "idx" number is the array index from the original "offers" array.  So the first offer will be sent with idx=0, the second with idx=1, etc.  This is so that the sender can figure out which answers belong to which of the peers that were created.  Combined with the searchKey, this uniquely identifies a peer.
 
 Craig sends Bob
-{"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+{"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "searchKey":<hex rep of the key Alice is searching for>, "idx":<idx>}
 The idx number is repeated from above.
 and may also send some number of
-{"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "idx":<idx>}
+{"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "searchKey":<hex rep of the key Alice is searching for>, "idx":<idx>}
 
 Bob sends Alice
 {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
@@ -43,7 +43,7 @@ and may also relay those ICE candidate msgs.
 Alice sends Bob
 {"op":"ICECandidate", "from":<hex rep of Alice's key>, "to":<hex rep of Craig's key>, "candidate":<whatever the ICE candidate thing is>}
 
-These ICE candidate messages don't need to have an idx number because by this point, Alice and Craig can identify each other by their keys.
+These ICE candidate messages don't need to have a (searchKey, idx) because by this point, Alice and Craig can identify each other by their keys.
 
 Bob relays those to Craig.
 

@@ -896,5 +896,88 @@ describe("KademliaRemoteNode", function () {
 
       assert.deepEqual(response.sort(), ansKeys);
     });
+
+    it("should be able to make a complete round trip.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var participants = kademlia.makePair();
+      var participants2 = kademlia.makePair();
+
+      assert.equal(participants.mockTime, participants2.mockTime);
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      // In the participants object, I have things called 'alice' and 'bob'.
+      // What they mean is that alice has a connection to bob, so when alice
+      // sends something, bob gets it.
+      // Here, I have "bobAccordingToAlice".  This is an object belonging to
+      // the person of alice.  When you instruct it to send something, bob
+      // should get it.
+      // Therefore, bobAccordingToAlice should have participants.alice, and
+      // vice versa.
+      // That is, when we say "according to", that is the person we are.  They
+      // should possess the particpant named after them.
+      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
+      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
+
+      alice._insertNode(bobAccordingToAlice);
+      bob._insertNode(aliceAccordingToBob);
+
+      // These handlers would normally be added as part of the kademlia
+      // process.  There will also be a process to add them when bootstrapping
+      // the network.  For now, I am bootstrapping by hand.
+      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+        bobAccordingToAlice.onMessage(bob.id, data);
+      });
+      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+        aliceAccordingToBob.onMessage(alice.id, data);
+      });
+
+      // Now actually start communication.
+      participants.alice.createOffer();
+      kademlia.mockTime.advance(5);
+
+      // Fill in Bob with some other nodes.
+      var craigAccordingToBob = new kademlia.KademliaRemoteNode({id: craigKey, peer: participants2.alice});
+      var bobAccordingToCraig = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants2.bob});
+
+      bob._insertNode(craigAccordingToBob);
+      craig._insertNode(bobAccordingToCraig);
+
+      // These handlers would normally be added as part of the kademlia
+      // process.  There will also be a process to add them when bootstrapping
+      // the network.  For now, I am bootstrapping by hand.
+      craigAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+        craigAccordingToBob.onMessage(craig.id, data);
+      });
+      bobAccordingToCraig.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+        bobAccordingToCraig.onMessage(bob.id, data);
+      });
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      // It's not working.  In wrtc-mock, I'm doing recvOffer.  It's setting a timeout to call the successCallback after 0ms.  It never gets called.  Could it be because participants.mockTime != participants2.mockTime?  Or I'm somehow using the real setTimeout?
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(responseCraigs.length, 1);
+
+      assert.equal(responseCraigs[0].id, craigKey);
+    });
   });
 });
