@@ -647,7 +647,7 @@ KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, callbac
   this.findNodeSearchSerial++;
 
   node.asAlice._makeOffers(function (offers, peers) {
-    node.listeners['FOUND_NODE'][key] = node.asAlice._recvFoundNode.bind(node.asAlice, key, peers, callback);
+    node.listeners['FOUND_NODE'][searchSerial] = node.asAlice._recvFoundNode.bind(node.asAlice, key, peers, callback);
 
     // Craig may start sending ICE candidates before we know his kademlia ID,
     // because he will start sending ICE candidates as soon as he gets the
@@ -689,11 +689,12 @@ KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, callbac
  * pertains to the first offer in the array.  We can use that to match up with
  * the WebRTCPeer we created.
  * @param string searchedKey The key that we were searching for, that this is in response to.
+ * @param number searchSerial The serial number that Alice sent, to help identify searches.
  * @param array peers An array of WebRTCPeer objects.  We created these to make offers from.  In the FOUND_NODE message, each answer has an "idx".  That refers to the index of a peer in this array.
  * @param function callback Call this function once we've told each of the peers to recvAnswer.  The signature is callback({<hex key>:<a KademliaRemoteNode with communication open>, ...}).  The callback is whatever was passed in to KademliaRemoteNode.prototype.Alice.sendFindNodePrimitive.
  * @param array answers [{key:<craig's key>, idx:<idx>, answer:<answer obj>}, ...]
  */
-KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, peers, callback, answers) {
+KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, searchSerial, peers, callback, answers) {
   // An object that will gather the accumulating peers.
   // We keep track of how many peers we have yet to hear from.  When that
   // reaches zero, we can send the reply to the callback.
@@ -825,17 +826,17 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // If we've received a FOUND_NODE message, we are acting as Alice.  Bob has
     // assembled a bunch of nodes for us, and is returning them here.
 
-    // That looks like this: {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
+    // That looks like this: {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "serial":<the original serial number>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
 
-    if (typeof data.key != "string") {
+    if (typeof data.key != "string" || typeof data.serial != "number" || !(data.answers instanceof Array)) {
       // Malformed.
-      // We're interested in finding the function to call when we get the results
-      // of a search for a particular key.  That key should be listed in the data here.
       return;
     }
-    if (!(data.answers instanceof Array)) {
-      // Malformed.
-      return;
+    for (var i=0; i<data.answers.length; i++) {
+      if (typeof answers[i] != "object" || typeof answers[i].key != "string" || typeof answers[i].idx != "number" || typeof answers[i].answer == "undefined") {
+        // Malformed.
+        return;
+      }
     }
 
     if (typeof this.listeners['FOUND_NODE'][data.key] == 'function') {
