@@ -293,9 +293,9 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
  * }, ...]
  * Each of the 'answer' members is something we should be able to feed into a
  * WebRTCPeer.recvAnswer().
- * @param function returnCallback This is a call to a KademliaRemoteNodeBob.sendFoundNode(fromKey, searchKey, answers).  But when it was passed to us, the first two args were curried, so all we still need to pass is answers.  In other words, this is what we will call once all the answers have come back and we've assembled them for the original requestor.
+ * @param function returnCallback This is a call to a KademliaRemoteNodeBob.sendFoundNode(fromKey, searchKey, searchSerial, answers).  But when it was passed to us, the first three args were curried, so all we still need to pass is answers.  In other words, this is what we will call once all the answers have come back and we've assembled them for the original requestor.
  */
-KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, offers, returnCallback) {
+KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, searchSerial, offers, returnCallback) {
   var numReturn = 0;
   var returnBucket = {};
   var visited = new Array(this.k);
@@ -303,6 +303,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, o
   var searchId = this.findNodeSearchSerial++;
   this.findNodeSearches[searchId] = {
     offers: offers,
+    serial: searchSerial,
     numOffers: offers.length,
     timeout: setTimeout(KademliaDHT.prototype._returnFindNodeSearch.bind(this, searchId, returnCallback), this.findNodeTimeout),
     answers: [],
@@ -329,7 +330,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, o
         var idx = this.findNodeSearches[searchId].offers.length-1;
         var offer = this.findNodeSearches[searchId].offers.pop();
         nodesTouched++;
-        remoteNode.asBob.sendOffer(findKey, offer, requestorKey, idx, this._recvAnswer.bind(this, searchId, returnCallback));
+        remoteNode.asBob.sendOffer(findKey, offer, requestorKey, searchSerial, idx, this._recvAnswer.bind(this, searchId, returnCallback));
 
         // Also start listening for Craig to send ICECandidate messages to Alice.
         remoteNode.asBob.addIceListener(remoteNode.id, requestorKey);
@@ -349,7 +350,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, o
  * Receive an answer from a remote node.  Put it in the accumulating return
  * value.  If the return bucket is full, return it via the callback.
  * @param string searchId The hex representation of the key that was requested.
- * @param function returnCallback This is a call to a KademliaRemoteNode.asBob.sendFoundNode(fromKey, searchKey, answers).  But when it was passed to us, the first two args were curried, so all we still need to pass is answers.  In other words, this is what we will call once all the answers have come back and we've assembled them for the original requestor.
+ * @param function returnCallback This is a call to a KademliaRemoteNode.asBob.sendFoundNode(fromKey, searchKey, searchSerial, answers).  But when it was passed to us, the first three args were curried, so all we still need to pass is answers.  In other words, this is what we will call once all the answers have come back and we've assembled them for the original requestor.
  * @param number idx
  * @param string craigId The hex representation of the id of the Craig that is sending this answer.
  * @param object answer An answer suitable for passing into WebRTCPeer.recvAnswer.
@@ -379,7 +380,7 @@ KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, idx, cra
  * Here, answers is the responses that each node gave us.  We should be able to
  * feed each one into a WebRTCPeer.recvAnswer().
  * @param string searchId The hex representation of the key that was being searched for.
- * @param function returnCallback This is a call to a KademliaRemoteNode.asBob.sendFoundNode(fromKey, searchKey, answers).  But when it was passed to us, the first two args were curried, so all we still need to pass is answers.  In other words, this is what we will call once all the answers have come back and we've assembled them for the original requestor.
+ * @param function returnCallback This is a call to a KademliaRemoteNode.asBob.sendFoundNode(fromKey, searchKey, searchSerial, answers).  But when it was passed to us, the first three args were curried, so all we still need to pass is answers.  In other words, this is what we will call once all the answers have come back and we've assembled them for the original requestor.
  */
 KademliaDHT.prototype._returnFindNodeSearch = function (searchId, returnCallback) {
   clearTimeout(this.findNodeSearches[searchId].timeout);
@@ -808,21 +809,17 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // We don't have to check if there's any active listeners for FIND_NODE; we
     // will always respond to anyone's FIND_NODE request.
     // A FIND_NODE looks like this:
-    // {"op":"FIND_NODE", "key":<hex representation of key to search for>, "offers":[k offers]}
-    if (typeof data.key != "string") {
-      // Malformed.
-      return;
-    }
-    if (!(data.offers instanceof Array)) {
+    // {"op":"FIND_NODE", "key":<hex representation of key to search for>, "serial":<a serial number>, "offers":[k offers]}
+    if (typeof data.key != "string" || typeof data.serial != "number" || !(data.offers instanceof Array)) {
       // Malformed.
       return;
     }
 
     // The returnCallback function should make a FOUND_NODE message and send it
     // across the wire.
-    // That looks like this: {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
-    var returnCallback = this.asBob.sendFoundNode.bind(this.asBob, fromKey, data.key);
-    this.dht.recvFindNodePrimitive(data.key, fromKey, data.offers, returnCallback);
+    // That looks like this: {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "serial":<the original serial number Alice sent>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
+    var returnCallback = this.asBob.sendFoundNode.bind(this.asBob, fromKey, data.key, data.serial);
+    this.dht.recvFindNodePrimitive(data.key, fromKey, data.serial, data.offers, returnCallback);
     break;
   case 'FOUND_NODE':
     // If we've received a FOUND_NODE message, we are acting as Alice.  Bob has
@@ -881,12 +878,12 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "searchKey":<hex rep of the key Alice is searching for>, "idx":<idx>}
     // We will also add Alice to Craig's buckets.
 
-    if (typeof data.from != "string" || data.searchKey != "string" || typeof data.idx != "number" || typeof data.offer == "undefined") {
+    if (typeof data.from != "string" || data.searchSerial != "string" || typeof data.idx != "number" || typeof data.offer == "undefined") {
       // Malformed.
       return;
     }
 
-    this.asCraig.recvOffer(data.from, data.offer, data.searchKey, data.idx, this.asCraig.sendAnswer.bind(this.asCraig, data.from, data.searchKey, data.idx));
+    this.asCraig.recvOffer(data.from, data.offer, data.searchSerial, data.idx, this.asCraig.sendAnswer.bind(this.asCraig, data.from, data.searchSerial, data.idx));
     break;
 
   case 'ICECandidate':
@@ -951,10 +948,11 @@ KademliaRemoteNodeBob.prototype.addIceListener = function (fromKey, toKey) {
  * The FOUND_NODE message looks like this:
  * {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}, ...]}
  */
-KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, answers) {
+KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, searchSerial, answers) {
   var msg = {
     op: "FOUND_NODE",
     key: searchKey,
+    serial: searchSerial,
     answers: answers,
   };
 
@@ -1007,11 +1005,11 @@ KademliaRemoteNodeBob.prototype.forwardIceCandidate = function (fromKey, toKey, 
  * @param string aliceKey The hex representation of Alice's key.
  * @param object offer An offer from Alice, suitable for passing to WebRTCPeer.recvOffer.
  * @param function sendAnswerCallback The callback is
- *   KademliaRemoteNodeCraig.prototype.sendAnswer(aliceKey, searchKey, idx, answer), but the
+ *   KademliaRemoteNodeCraig.prototype.sendAnswer(aliceKey, searchSerial, idx, answer), but the
  *   first three args have been curried, so we only need to send
  *   answer.  The answer should be an answer suitable for a WebRTCPeer.recvAnswer.
  */
-KademliaRemoteNodeCraig.prototype.recvOffer = function (aliceKey, offer, searchKey, idx, sendAnswerCallback) {
+KademliaRemoteNodeCraig.prototype.recvOffer = function (aliceKey, offer, searchSerial, idx, sendAnswerCallback) {
   var craig = this;
   var bob = this.node.peer;
 
@@ -1031,12 +1029,13 @@ KademliaRemoteNodeCraig.prototype.recvOffer = function (aliceKey, offer, searchK
 
     sendLocalIce: function (peer, iceCandidate) {
       // The message to Bob looks like this:
-      // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "idx":<idx>}
+      // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
       bob.send('dht', {
         op: 'ICECandidate',
         from: craig.node.dht.id,
         to: aliceKey,
         candidate: iceCandidate,
+        serial: searchSerial,
         idx: idx,
       });
     },
@@ -1070,9 +1069,9 @@ KademliaRemoteNodeCraig.prototype.recvOffer = function (aliceKey, offer, searchK
 
 /**
  * Send our answer to Bob to forward on to Alice.
- * {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+ * {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "serial":<the serial number Alice sent>, "idx":<idx>}
  */
-KademliaRemoteNodeCraig.prototype.sendAnswer = function (aliceKey, idx, answer) {
+KademliaRemoteNodeCraig.prototype.sendAnswer = function (aliceKey, searchSerial, idx, answer) {
   var bob = this.node.peer;
   var craig = this.node.dht;
 
@@ -1081,6 +1080,7 @@ KademliaRemoteNodeCraig.prototype.sendAnswer = function (aliceKey, idx, answer) 
     to: aliceKey,
     from: craig.id,
     idx: idx,
+    serial: searchSerial,
     answer: answer,
   });
 };

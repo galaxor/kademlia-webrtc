@@ -23,27 +23,27 @@ We also have to ship ICE candidates around!!
 To turn this into a wire protocol:
 
 Alice sends Bob
-{"op":"FIND_NODE", "key":<hex representation of key Alice is searching for>, "offers":[k offers]}
+{"op":"FIND_NODE", "key":<hex representation of key Alice is searching for>, "serial":<a serial number>, "offers":[k offers]}
 
 Bob finds a node (say Craig), and sends Craig
-{"op":"offer", "from":<hex representation of Alice's id>, "offer":<offer>, "searchKey":<hex rep of the key Alice is searching for>, "idx":<a number>}
+{"op":"offer", "from":<hex representation of Alice's id>, "offer":<offer>, "serial":<the serial number that Alice sent>, "idx":<a number>}
 
 The "idx" number is the array index from the original "offers" array.  So the first offer will be sent with idx=0, the second with idx=1, etc.  This is so that the sender can figure out which answers belong to which of the peers that were created.  Combined with the searchKey, this uniquely identifies a peer.
 
 Craig sends Bob
-{"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "searchKey":<hex rep of the key Alice is searching for>, "idx":<idx>}
+{"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "serial":<the serial number Alice sent>, "idx":<idx>}
 The idx number is repeated from above.
 and may also send some number of
-{"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "searchKey":<hex rep of the key Alice is searching for>, "idx":<idx>}
+{"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
 
 Bob sends Alice
-{"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
+{"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "serial":<the original serial number Alice sent>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
 and may also relay those ICE candidate msgs.
 
 Alice sends Bob
 {"op":"ICECandidate", "from":<hex rep of Alice's key>, "to":<hex rep of Craig's key>, "candidate":<whatever the ICE candidate thing is>}
 
-These ICE candidate messages don't need to have a (searchKey, idx) because by this point, Alice and Craig can identify each other by their keys.
+These ICE candidate messages don't need to have a (serial, idx) because by this point, Alice and Craig can identify each other by their keys.
 
 Bob relays those to Craig.
 
