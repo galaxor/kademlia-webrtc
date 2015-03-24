@@ -146,7 +146,7 @@ describe("KademliaDHT", function () {
         retVal = answers;
       };
 
-      dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '00000000', 0, ['fake offer'], callbackFn);
 
       assert.deepEqual(retVal, []);
     });
@@ -169,7 +169,7 @@ describe("KademliaDHT", function () {
         retVal = answers;
       };
 
-      dht.recvFindNodePrimitive('80000001', '80000001', ['fake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '80000001', 0, ['fake offer'], callbackFn);
 
       assert.deepEqual(retVal, []);
     });
@@ -220,7 +220,7 @@ describe("KademliaDHT", function () {
         }
       };
 
-      dht.recvFindNodePrimitive('80000001', '80000002', ['fake offer', 'flake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '80000002', 0, ['fake offer', 'flake offer'], callbackFn);
 
       kademlia.mockTime.advance(20);
 
@@ -245,7 +245,7 @@ describe("KademliaDHT", function () {
         retVal = answers;
       };
 
-      dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '00000000', 0, ['fake offer'], callbackFn);
 
       // Let the time run out while we wait for answers.
       kademlia.mockTime.advance(600);
@@ -289,7 +289,7 @@ describe("KademliaDHT", function () {
         }
       };
 
-      dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer', 'flake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '00000000', 0, ['fake offer', 'flake offer'], callbackFn);
 
       kademlia.mockTime.advance(600);
 
@@ -326,7 +326,7 @@ describe("KademliaDHT", function () {
         }
       };
 
-      dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer', 'flake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '00000000', 0, ['fake offer', 'flake offer'], callbackFn);
 
       kademlia.mockTime.advance(20);
 
@@ -373,7 +373,7 @@ describe("KademliaDHT", function () {
         }
       };
 
-      dht.recvFindNodePrimitive('20000001', '00000000', keys, callbackFn);
+      dht.recvFindNodePrimitive('20000001', '00000000', 0, keys, callbackFn);
 
       kademlia.mockTime.advance(20);
 
@@ -429,7 +429,7 @@ describe("KademliaDHT", function () {
       };
 
       var reqs = [1,2,3,4];
-      dht.recvFindNodePrimitive('20000001', '00000000', reqs, callbackFn);
+      dht.recvFindNodePrimitive('20000001', '00000000', 0, reqs, callbackFn);
 
       kademlia.mockTime.advance(20);
 
@@ -484,7 +484,7 @@ describe("KademliaDHT", function () {
         }
       };
 
-      dht.recvFindNodePrimitive('20000001', '00000000', keys, callbackFn);
+      dht.recvFindNodePrimitive('20000001', '00000000', 0, keys, callbackFn);
 
       kademlia.mockTime.advance(20);
 
@@ -539,7 +539,7 @@ describe("KademliaDHT", function () {
         }
       };
 
-      dht.recvFindNodePrimitive('08000001', '00000000', keys, callbackFn);
+      dht.recvFindNodePrimitive('08000001', '00000000', 0, keys, callbackFn);
 
       kademlia.mockTime.advance(20);
 
@@ -596,7 +596,7 @@ describe("KademliaDHT", function () {
       };
 
       var reqKeys = [1,2,3,4];
-      dht.recvFindNodePrimitive('10000001', '00000000', reqKeys, callbackFn);
+      dht.recvFindNodePrimitive('10000001', '00000000', 0, reqKeys, callbackFn);
 
       kademlia.mockTime.advance(20);
 
@@ -651,7 +651,7 @@ describe("KademliaDHT", function () {
       };
 
       var reqKeys = [1,2,3,4];
-      dht.recvFindNodePrimitive('10000001', '00000000', reqKeys, callbackFn);
+      dht.recvFindNodePrimitive('10000001', '00000000', 0, reqKeys, callbackFn);
 
       kademlia.mockTime.advance(20);
 
@@ -716,7 +716,7 @@ describe("KademliaDHT", function () {
         }
       };
 
-      dht.recvFindNodePrimitive('80000001', '00000000', ['fake offer', 'flake offer'], callbackFn);
+      dht.recvFindNodePrimitive('80000001', '00000000', 0, ['fake offer', 'flake offer'], callbackFn);
 
       kademlia.mockTime.advance(20);
 
