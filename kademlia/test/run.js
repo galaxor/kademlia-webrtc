@@ -268,7 +268,7 @@ describe("KademliaDHT", function () {
             // Instead of sending to anybody, just call your own onMessage.
             // This is what we will receive.
             // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-            willRespondNode.onMessage(key1, {op: 'answer', to: msg.from, from: key1, answer:'good call', idx:msg.idx});
+            willRespondNode.onMessage(key1, {op: 'answer', to: msg.from, from: key1, answer:'good call', serial:msg.serial, idx:msg.idx});
           }
         }, 10);
       };
@@ -311,7 +311,7 @@ describe("KademliaDHT", function () {
             // Instead of sending to anybody, just call your own onMessage.
             // This is what we will receive.
             // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-            willRespondNode.onMessage(key1, {op: 'answer', to: msg.from, from: key1, answer:'good call', idx:msg.idx});
+            willRespondNode.onMessage(key1, {op: 'answer', to: msg.from, from: key1, answer:'good call', serial:msg.serial, idx:msg.idx});
           }
         }, 10);
       };
@@ -357,7 +357,7 @@ describe("KademliaDHT", function () {
               // Instead of sending to anybody, just call your own onMessage.
               // This is what we will receive.
               // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-              willRespondNode.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+              willRespondNode.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, serial:msg.serial, idx:msg.idx});
             }
           }, 10);
         };
@@ -412,7 +412,7 @@ describe("KademliaDHT", function () {
               // Instead of sending to anybody, just call your own onMessage.
               // This is what we will receive.
               // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, serial:msg.serial, idx:msg.idx});
             }
           }, 10);
         };
@@ -468,7 +468,7 @@ describe("KademliaDHT", function () {
               // Instead of sending to anybody, just call your own onMessage.
               // This is what we will receive.
               // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, serial:msg.serial, idx:msg.idx});
             }
           }, 10);
         };
@@ -523,7 +523,7 @@ describe("KademliaDHT", function () {
               // Instead of sending to anybody, just call your own onMessage.
               // This is what we will receive.
               // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, serial:msg.serial, idx:msg.idx});
             }
           }, 10);
         };
@@ -579,7 +579,7 @@ describe("KademliaDHT", function () {
               // Instead of sending to anybody, just call your own onMessage.
               // This is what we will receive.
               // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, serial:msg.serial, idx:msg.idx});
             }
           }, 10);
         };
@@ -634,7 +634,7 @@ describe("KademliaDHT", function () {
               // Instead of sending to anybody, just call your own onMessage.
               // This is what we will receive.
               // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, serial:msg.serial, idx:msg.idx});
             }
           }, 10);
         };
@@ -682,7 +682,7 @@ describe("KademliaDHT", function () {
             // Instead of sending to anybody, just call your own onMessage.
             // This is what we will receive.
             // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-            node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:'good call', idx:msg.idx});
+            node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:'good call', serial:msg.serial, idx:msg.idx});
           }
         }, 10);
       };
@@ -701,7 +701,7 @@ describe("KademliaDHT", function () {
             // Instead of sending to anybody, just call your own onMessage.
             // This is what we slow receive.
             // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-            node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:'slow call', idx:msg.idx});
+            node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:'slow call', serial:msg.serial, idx:msg.idx});
           }
         }, 40);
       };
@@ -857,7 +857,7 @@ describe("KademliaRemoteNode", function () {
               // Instead of sending to anybody, just call your own onMessage.
               // This is what we will receive.
               // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, idx:msg.idx});
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, serial:msg.serial, idx:msg.idx});
             }
           }, 10);
         };
