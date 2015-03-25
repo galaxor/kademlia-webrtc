@@ -188,8 +188,8 @@ describe("KademliaDHT", function () {
           if (chan == 'dht' && msg.op == 'offer') {
             // Instead of sending to anybody, just call your own onMessage.
             // This is what we will receive.
-            // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
-            callMeNode.onMessage(key1, {op: 'answer', to: msg.from, from: key1, answer:'good call', idx:msg.idx});
+            // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "serial": <serial>, "answer":<answer>, "idx":<idx>}
+            callMeNode.onMessage(key1, {op: 'answer', to: msg.from, from: key1, serial:msg.serial, answer:'good call', idx:msg.idx});
           }
         }, 10);
       };
