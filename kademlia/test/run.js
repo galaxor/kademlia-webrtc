@@ -30,6 +30,7 @@ function mockTimedKademlia(existingMockTime) {
       timers: {
         setTimeout: mockTime.setTimeout,
         clearTimeout: mockTime.clearTimeout,
+        now: mockTime.now,
       },
       WebRTCPeer: WebRTCPeer,
     },
@@ -785,6 +786,7 @@ describe("KademliaRemoteNode", function () {
       assert.deepEqual(bobLog, [{
         op: 'FIND_NODE',
         key: '00000000',
+        serial: 0,
       }]);
 
       // 4 is the value of k for this network.
@@ -880,7 +882,7 @@ describe("KademliaRemoteNode", function () {
         assert(0 == "This shouldn't have been called");
       });
 
-      kademlia.mockTime.advance(1000);
+      kademlia.mockTime.advance(100);
 
       assert.notEqual(response, null);
 

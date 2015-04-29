@@ -7,6 +7,8 @@ var timers = require('timers');
 var setTimeout = timers.setTimeout;
 var clearTimeout = timers.clearTimeout;
 
+var now = timers.now;
+
 /**
  * Create a distributed hash table using the Kademlia protocol as specified here:
  *    http://xlattice.sourceforge.net/components/protocol/kademlia/specs.html
@@ -287,7 +289,7 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
  * The signature of the callback is returnCallback(answers).
  * Here, answers is the responses that each node gave us.
  * It has the structure [{
- *   id: craigId,
+ *   key: craigId,
  *   idx: idx,
  *   answer: answer,
  * }, ...]
@@ -303,6 +305,8 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
   var searchId = this.findNodeSearchSerial++;
   this.findNodeSearches[searchId] = {
     offers: offers,
+    searchKey: findKey,
+    requestorKey: requestorKey,
     serial: searchSerial,
     numOffers: offers.length,
     timeout: setTimeout(KademliaDHT.prototype._returnFindNodeSearch.bind(this, searchId, returnCallback), this.findNodeTimeout),
@@ -357,7 +361,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
  */
 KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, idx, craigId, answer) {
   this.findNodeSearches[searchId].answers.push({
-    id: craigId,
+    key: craigId,
     idx: idx,
     answer: answer,
   });
@@ -383,8 +387,10 @@ KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, idx, cra
  * @param function returnCallback This is a call to a KademliaRemoteNode.asBob.sendFoundNode(fromKey, searchKey, searchSerial, answers).  But when it was passed to us, the first three args were curried, so all we still need to pass is answers.  In other words, this is what we will call once all the answers have come back and we've assembled them for the original requestor.
  */
 KademliaDHT.prototype._returnFindNodeSearch = function (searchId, returnCallback) {
-  clearTimeout(this.findNodeSearches[searchId].timeout);
-  returnCallback(this.findNodeSearches[searchId].answers);
+  var findNodeSearch = this.findNodeSearches[searchId];
+  clearTimeout(findNodeSearch.timeout);
+  returnCallback(findNodeSearch.answers);
+
   delete this.findNodeSearches[searchId];
 };
 
@@ -489,7 +495,10 @@ KademliaRemoteNodeBob.prototype.sendOffer = function (findKey, offer, aliceKey, 
   // (using the recvAnswerCallback) the assembled return value, once we've
   // received all of the answers or when we've reached the timeout.
 
-  this.node.listeners['answer'][aliceKey] = recvAnswerCallback;
+  if (typeof this.node.listeners['answer'][aliceKey] == "undefined") {
+    this.node.listeners['answer'][aliceKey] = {};
+  }
+  this.node.listeners['answer'][aliceKey][searchSerial] = recvAnswerCallback;
 
   this.node.peer.send('dht', {
     op: 'offer',
@@ -835,17 +844,17 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       return;
     }
     for (var i=0; i<data.answers.length; i++) {
-      if (typeof answers[i] != "object" || typeof answers[i].key != "string" || typeof answers[i].idx != "number" || typeof answers[i].answer == "undefined") {
+      if (typeof data.answers[i] != "object" || typeof data.answers[i].key != "string" || typeof data.answers[i].idx != "number" || typeof data.answers[i].answer == "undefined") {
         throw new Error("Malformed");
         return;
       }
     }
 
-    if (typeof this.listeners['FOUND_NODE'][data.key] == 'function') {
-      this.listeners['FOUND_NODE'][data.key](data.answers);
+    if (typeof this.listeners['FOUND_NODE'][data.serial] == 'function') {
+      this.listeners['FOUND_NODE'][data.serial](data.answers);
     } else {
       // Unexpected.
-      return;
+      throw new Error("Received an unexpected FOUND_NODE");
     }
     break;
 
@@ -860,12 +869,12 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       return;
     }
 
-    if (typeof this.listeners['answer'][data.to] == 'function') {
+    if (typeof this.listeners['answer'][data.to] == 'object' && typeof this.listeners['answer'][data.to][data.serial] == 'function') {
       // The function KademliaDHT.prototype._recvAnswer 
       // has this signature: function (searchId, returnCallback, idx, craigId, answer)
       // But it has been curried a couple times.  It already has these args set:
       // (searchId, returnCallback).  So all we need to send back is (idx, craigId, answer).
-      this.listeners['answer'][data.to](data.idx, data.from, data.answer);
+      this.listeners['answer'][data.to][data.serial](data.idx, data.from, data.answer);
     } else {
       // Unexpected.
       return;
@@ -1068,7 +1077,6 @@ KademliaRemoteNodeCraig.prototype.recvOffer = function (aliceKey, offer, searchS
     },
   });
 
-  debugger;
   peer.recvOffer(offer);
 };
 
