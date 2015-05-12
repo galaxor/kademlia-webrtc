@@ -145,7 +145,7 @@ KademliaDHT.prototype.addListener = function (op, from, callback) {
  */
 KademliaDHT.prototype.onMessage = function (from, msg) {
   if (typeof msg.op != "string") {
-    throw new Error("Malformed");
+    throw new MalformedError("Malformed");
     return;
   }
 
@@ -334,10 +334,12 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
         var idx = this.findNodeSearches[searchId].offers.length-1;
         var offer = this.findNodeSearches[searchId].offers.pop();
         nodesTouched++;
-        remoteNode.asBob.sendOffer(findKey, offer, requestorKey, searchSerial, idx, this._recvAnswer.bind(this, searchId, returnCallback));
 
-        // Also start listening for Craig to send ICECandidate messages to Alice.
+        // Start listening for Craig to send ICECandidate messages to Alice.
         remoteNode.asBob.addIceListener(remoteNode.id, requestorKey);
+
+        // Actually send the offer.
+        remoteNode.asBob.sendOffer(findKey, offer, requestorKey, searchSerial, idx, this._recvAnswer.bind(this, searchId, returnCallback));
       }
     }
     bucketIndex = (bucketIndex + 1) % this.B;
@@ -610,15 +612,15 @@ KademliaRemoteNodeAlice.prototype.recvIceCandidate = function (searchSerial, idx
   
   // Refresh the timeout.  We've heard from them now, so don't give up on them
   // until they've gone silent for the full iceTimeout ms from now.
-  cancelTimeout(this.iceTimeouts[this.node.dht.id][searchSerial][idx]);
-  this.node.iceTimeouts[searchSerial][fromIdx] = setTimeout(this._cancelIceListener.bind(this, searchSerial, idx), this.node.iceTimeout);
+  clearTimeout(this.node.iceTimeouts[this.node.dht.id][searchSerial][idx]);
+  this.node.iceTimeouts[this.node.dht.id][searchSerial][idx] = setTimeout(this._cancelIceListener.bind(this, searchSerial, idx), this.node.iceTimeout);
 };
 
 /**
  * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
  */
 KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, idx) {
-  cancelTimeout(this.iceTimeouts[searchSerial][idx]);
+  clearTimeout(this.iceTimeouts[searchSerial][idx]);
   delete this.node.iceTimeouts[searchSerial][idx];
   delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][idx];
   if (Object.keys(this.iceTimeouts[searchSerial]).length == 0) {
@@ -658,7 +660,7 @@ KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, callbac
   this.findNodeSearchSerial++;
 
   node.asAlice._makeOffers(function (offers, peers) {
-    node.listeners['FOUND_NODE'][searchSerial] = node.asAlice._recvFoundNode.bind(node.asAlice, key, peers, callback);
+    node.listeners['FOUND_NODE'][searchSerial] = node.asAlice._recvFoundNode.bind(node.asAlice, key, searchSerial, peers, callback);
 
     // Craig may start sending ICE candidates before we know his kademlia ID,
     // because he will start sending ICE candidates as soon as he gets the
@@ -808,7 +810,7 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
  */
 KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
   if (typeof data.op != "string") {
-    throw new Error("Malformed");
+    throw new MalformedError("Malformed");
     return;
   }
 
@@ -823,7 +825,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // A FIND_NODE looks like this:
     // {"op":"FIND_NODE", "key":<hex representation of key to search for>, "serial":<a serial number>, "offers":[k offers]}
     if (typeof data.key != "string" || typeof data.serial != "number" || !(data.offers instanceof Array)) {
-      throw new Error("Malformed");
+      throw new MalformedError("Malformed");
       return;
     }
 
@@ -840,12 +842,12 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // That looks like this: {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "serial":<the original serial number>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
 
     if (typeof data.key != "string" || typeof data.serial != "number" || !(data.answers instanceof Array)) {
-      throw new Error("Malformed");
+      throw new MalformedError("Malformed");
       return;
     }
     for (var i=0; i<data.answers.length; i++) {
       if (typeof data.answers[i] != "object" || typeof data.answers[i].key != "string" || typeof data.answers[i].idx != "number" || typeof data.answers[i].answer == "undefined") {
-        throw new Error("Malformed");
+        throw new MalformedError("Malformed");
         return;
       }
     }
@@ -854,18 +856,18 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       this.listeners['FOUND_NODE'][data.serial](data.answers);
     } else {
       // Unexpected.
-      throw new Error("Received an unexpected FOUND_NODE");
+      throw new UnexpectedError("Received an unexpected FOUND_NODE");
     }
     break;
 
   case 'answer':
     // Here, we act as Bob.  A Craig has sent us an answer, like this:
-    // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "searchKey":<hex rep of the key Alice was searching for>, "idx":<idx>}
+    // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "serial":<serial>, "idx":<idx>}
     // We will accumulate these and send them on to Alice as a FOUND_NODE message.
     if (typeof data.to != "string" || typeof data.from != "string" 
         || typeof data.answer == "undefined" || typeof data.serial != "number"
         || typeof data.idx != "number") {
-      throw new Error("Malformed");
+      throw new MalformedError("Malformed");
       return;
     }
 
@@ -877,6 +879,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       this.listeners['answer'][data.to][data.serial](data.idx, data.from, data.answer);
     } else {
       // Unexpected.
+      throw new UnexpectedError("Unexpected");
       return;
     }
     break;
@@ -890,12 +893,12 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "searchKey":<hex rep of the key Alice is searching for>, "idx":<idx>}
     // We will also add Alice to Craig's buckets.
 
-    if (typeof data.from != "string" || data.searchSerial != "string" || typeof data.idx != "number" || typeof data.offer == "undefined") {
-      throw new Error("Malformed");
+    if (typeof data.from != "string" || typeof data.serial != "number" || typeof data.idx != "number" || typeof data.offer == "undefined") {
+      throw new MalformedError("Malformed");
       return;
     }
 
-    this.asCraig.recvOffer(data.from, data.offer, data.searchSerial, data.idx, this.asCraig.sendAnswer.bind(this.asCraig, data.from, data.searchSerial, data.idx));
+    this.asCraig.recvOffer(data.from, data.offer, data.serial, data.idx, this.asCraig.sendAnswer.bind(this.asCraig, data.from, data.serial, data.idx));
     break;
 
   case 'ICECandidate':
@@ -905,11 +908,10 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "idx":<idx>}
     // If Alice sent it, it won't have the 'idx'.
     if (typeof data.from != "string" || typeof data.to != "string" || typeof data.candidate != "object") {
-      throw new Error("Malformed");
+      throw new MalformedError("Malformed");
       return;
     }
 
-    // XXX
     // Someone should establish listeners, and should establish timeouts to get
     // rid of them when we give up, and legit get rid of them when they're not
     // needed anymore (when the data channel opens!)
@@ -923,7 +925,61 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // kademlia ID.
     // Craig should establish listeners for Alice's ICE candidates when he gets
     // the offer.
-    throw(new Error("Not implemented yet"));
+
+    // If I added listeners, whether as Alice, Bob, or Craig, they will all be
+    // in the this.listeners['ICECandidate'] array.
+    // But they each add them in a slightly different format, and the callback
+    // has a slightly different signature.
+
+    // Alice format
+    // this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][fromIdx] = this.recvIceCandidate.bind(this, searchSerial, fromIdx, peer);
+
+    // Bob format
+    // this.node.listeners['ICECandidate'][fromKey][toKey] = this.forwardIceCandidate.bind(this, fromKey, toKey);
+
+    // Craig format
+    // this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id] = this.recvIceCandidate.bind(this, aliceKey, alicePeer);
+
+    // --
+
+    if (data.to == this.dht.id) {
+      // This is either Alice or Craig format.
+
+      if (typeof data.serial == "undefined" || typeof data.idx == "undefined" || typeof data.candidate) {
+        // This is Alice format.  Act as Alice.
+        // Alice format
+        // this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][fromIdx] = this.recvIceCandidate.bind(this, searchSerial, fromIdx, peer);
+
+        if (typeof this.listeners['ICECandidate'][this.dht.id] == "undefined"
+            || typeof this.listeners['ICECandidate'][this.dht.id][data.serial] == "undefined"
+            || typeof this.listeners['ICECandidate'][this.dht.id][data.serial][data.idx] == "undefined") {
+          throw new UnexpectedError("Unexpected ICECandidate.");
+        }
+
+        this.listeners['ICECandidate'][this.dht.id][data.serial][data.idx](data.candidate);
+      } else if (typeof this.listeners['ICECandidate'][fromKey] != "undefined"
+        && this.listeners['ICECandidate'][fromKey][this.dht.id] != "undefined") {
+        // This is Craig format.  Act as Craig.
+        // Craig format
+        // this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id] = this.recvIceCandidate.bind(this, aliceKey, alicePeer);
+
+        // This is Craig format.  Act as Craig.
+        this.listeners['ICECandidate'][fromKey][this.dht.id](data.candidate);
+      }
+    }
+
+    // Bob format
+    // this.node.listeners['ICECandidate'][fromKey][toKey] = this.forwardIceCandidate.bind(this, fromKey, toKey);
+
+    else if (typeof this.listeners['ICECandidate'][fromKey] != "undefined" 
+        && typeof this.listeners['ICECandidate'][fromKey][data.to] != "undefined") {
+      // This is Bob format.  Act as Bob.
+      this.listeners['ICECandidate'][fromKey][data.to](data.candidate, data.serial, data.idx);
+    }
+
+    else {
+      throw new UnexpectedError("Unexpected ICECandidate");
+    }
     
     break;
 
@@ -984,7 +1040,7 @@ KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, s
  * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
  */
 KademliaRemoteNodeBob.prototype._cancelIceListener = function (fromKey, toKey) {
-  cancelTimeout(this.node.iceTimeouts[fromKey][toKey]);
+  clearTimeout(this.node.iceTimeouts[fromKey][toKey]);
   delete this.node.iceTimeouts[fromKey][toKey];
   delete this.node.listeners['ICECandidate'][fromKey][toKey];
   if (Object.keys(this.node.iceTimeouts[fromKey]).length == 0) {
@@ -1001,13 +1057,24 @@ KademliaRemoteNodeBob.prototype._cancelIceListener = function (fromKey, toKey) {
  * If it's from Craig to Alice:
  * {"op":"ICECandidate", "from":<hex rep of Alice's key>, "to":<hex rep of Craig's key>, "idx":<idx>, "candidate":<whatever the ICE candidate thing is>}
  */
-KademliaRemoteNodeBob.prototype.forwardIceCandidate = function (fromKey, toKey, msg) {
+KademliaRemoteNodeBob.prototype.forwardIceCandidate = function (fromKey, toKey, candidate, serial, idx) {
   // Replace the fromKey with the known fromKey, so we know that nobody is
   // misrepresenting themselves.
-  msg.from = fromKey;
+  var msg = {
+    op: 'ICECandidate',
+    from: fromKey,
+    to: toKey,
+    candidate: candidate,
+  }
+  if (typeof serial != "undefined") {
+    msg.serial = serial;
+  }
+  if (typeof idx != "undefined") {
+    msg.idx = idx;
+  }
 
   var recipient = this.node.dht.knownPeers[toKey];
-  recipient.peer.send('dht', fwdMsg);
+  recipient.peer.send('dht', msg);
 };
 
 
@@ -1077,7 +1144,51 @@ KademliaRemoteNodeCraig.prototype.recvOffer = function (aliceKey, offer, searchS
     },
   });
 
+  // Prepare to receive ICE Candidates.
+  this.addIceListener(aliceKey, peer);
+
   peer.recvOffer(offer);
+};
+
+/**
+ * Receive an ICE candidate from Alice.
+ */
+KademliaRemoteNodeCraig.prototype.addIceListener = function (aliceKey, alicePeer) {
+  if (typeof this.node.listeners['ICECandidate'][aliceKey] == "undefined") {
+    this.node.listeners['ICECandidate'][aliceKey] = {};
+  }
+
+  this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id] = this.recvIceCandidate.bind(this, aliceKey, alicePeer);
+  // Set up a timeout
+  if (typeof this.node.iceTimeouts[aliceKey] == "undefined") {
+    this.node.iceTimeouts[aliceKey] = {};
+  }
+  this.node.iceTimeouts[aliceKey][this.node.dht.id] = setTimeout(this._cancelIceListener.bind(this, aliceKey), this.node.iceTimeout);
+};
+
+/**
+ * Receive an ICE candidate from Alice.
+ */
+KademliaRemoteNodeCraig.prototype.recvIceCandidate = function (aliceKey, alicePeer, candidate) {
+  alicePeer.recvRemoteIceCandidate(candidate);
+  
+  // Refresh the timeout.  We've heard from them now, so don't give up on them
+  // until they've gone silent for the full iceTimeout ms from now.
+  clearTimeout(this.iceTimeouts[aliceKey][this.node.dht.id]);
+  this.node.iceTimeouts[aliceKey][this.node.dht.id] = setTimeout(this._cancelIceListener.bind(this, searchSerial, idx), this.node.iceTimeout);
+};
+
+/**
+ * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
+ */
+KademliaRemoteNodeCraig.prototype._cancelIceListener = function (aliceKey) {
+  clearTimeout(this.node.iceTimeouts[aliceKey][this.node.dht.id]);
+  delete this.node.iceTimeouts[aliceKey][this.node.dht.id];
+  delete this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id];
+  if (Object.keys(this.node.iceTimeouts[aliceKey]).length == 0) {
+    delete this.node.iceTimeouts[aliceKey];
+    delete this.node.listeners['ICECandidate'][aliceKey];
+  }
 };
 
 /**
@@ -1137,6 +1248,24 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
 KademliaRemoteNodeCraig.prototype.abandonPendingPeer = function (aliceKey) {
   delete this.pendingPeers[aliceKey];
 };
+
+
+/**
+ * Custom exceptions.
+ */
+function MalformedError(message) {
+  this.name = "MalformedError";
+  this.message = message || "";
+  this.stack = new Error().stack;
+}
+MalformedError.prototype = Object.create(Error.prototype);
+
+function UnexpectedError(message) {
+  this.name = "UnexpectedError";
+  this.message = message || "";
+  this.stack = new Error().stack;
+}
+UnexpectedError.prototype = Object.create(Error.prototype);
 
 
 /**
@@ -1254,4 +1383,4 @@ bitOps.xor = function (b1, b2) {
   return retval;
 };
 
-module.exports = exports = {KademliaDHT: KademliaDHT, KademliaRemoteNode: KademliaRemoteNode, bitOps: bitOps};
+module.exports = exports = {KademliaDHT: KademliaDHT, KademliaRemoteNode: KademliaRemoteNode, bitOps: bitOps, MalformedError: MalformedError, UnexpectedError: UnexpectedError};

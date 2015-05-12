@@ -869,7 +869,7 @@ describe("KademliaRemoteNode", function () {
       var response = null;
 
       // We won't be getting real answers, so we won't be able to actually feed them in to WebRTCPeer.recvAnswer.  Therefore, we will replace _recvFoundNode and use it to 
-      bobAccordingToAlice.asAlice._recvFoundNode = function (searchedKey, peers, callback, answers) {
+      bobAccordingToAlice.asAlice._recvFoundNode = function (searchedKey, searchSerial, peers, callback, answers) {
         response = [];
         for (var i=0; i<answers.length; i++) {
           response.push(answers[i].answer);
