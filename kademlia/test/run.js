@@ -971,15 +971,15 @@ describe("KademliaRemoteNode", function () {
         responseCraigs = craigs;
       });
 
-      // It's not working.  In wrtc-mock, I'm doing recvOffer.  It's setting a timeout to call the successCallback after 0ms.  It never gets called.  Could it be because participants.mockTime != participants2.mockTime?  Or I'm somehow using the real setTimeout?
-
       kademlia.mockTime.advance(1000);
 
       assert.notEqual(responseCraigs, null);
 
-      assert.equal(responseCraigs.length, 1);
+      assert.equal(Object.keys(responseCraigs).length, 1);
 
-      assert.equal(responseCraigs[0].id, craigKey);
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
     });
   });
 });

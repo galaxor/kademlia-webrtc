@@ -773,7 +773,8 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
           remoteNode.onMessage(key, data);
         };
 
-        remoteNode.addChannelMessageHandler('dht', onMessage);
+        debugger;
+        remoteNode.peer.addChannelMessageHandler('dht', onMessage);
 
         replyPeers.awaitingReply--;
         if (replyPeers.awaitingReply <= 0) {
@@ -784,6 +785,8 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
           callback(replyPeers.peers);
         }
       };
+
+      peers[idx].addDataChannelHandler('dht', onOpen);
     } else {
       // We already knew about this peer.  Just put the existing KademliaRemoteNode in the list.
       replyPeers.peers[key] = this.node.dht.knownPeers[key];
