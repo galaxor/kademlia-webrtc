@@ -362,6 +362,10 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
  * @param object answer An answer suitable for passing into WebRTCPeer.recvAnswer.
  */
 KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, idx, craigId, answer) {
+  if (typeof this.findNodeSearches[searchId] == "undefined") {
+    throw new UnexpectedError("Got an unexpected answer.");
+  }
+
   this.findNodeSearches[searchId].answers.push({
     key: craigId,
     idx: idx,
