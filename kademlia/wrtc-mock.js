@@ -38,14 +38,13 @@ wrtc.RTCPeerConnection.prototype.setRemoteDescription = function (sessionDescrip
     }
   }
 
-  // XXX It doesn't work when I use the setTimeout function here, with two pairs of peers.  Why is that??
-  // setTimeout(function () {
+  setTimeout(function () {
     successCallback();
 
     peer.generateIceCandidate();
 
     peer.openDataChannels();
-  // }, 0);
+  }, 0);
 };
 
 wrtc.RTCPeerConnection.prototype.onicecandidate = function (event) { };
