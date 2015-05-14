@@ -146,7 +146,6 @@ KademliaDHT.prototype.addListener = function (op, from, callback) {
 KademliaDHT.prototype.onMessage = function (from, msg) {
   if (typeof msg.op != "string") {
     throw new MalformedError("Malformed");
-    return;
   }
 
   var op = msg.op;
@@ -818,7 +817,6 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
 KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
   if (typeof data.op != "string") {
     throw new MalformedError("Malformed");
-    return;
   }
 
   // I'm going to be explicit about which messages we accept and how to process them.
@@ -833,7 +831,6 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // {"op":"FIND_NODE", "key":<hex representation of key to search for>, "serial":<a serial number>, "offers":[k offers]}
     if (typeof data.key != "string" || typeof data.serial != "number" || !(data.offers instanceof Array)) {
       throw new MalformedError("Malformed");
-      return;
     }
 
     // The returnCallback function should make a FOUND_NODE message and send it
@@ -850,12 +847,10 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
 
     if (typeof data.key != "string" || typeof data.serial != "number" || !(data.answers instanceof Array)) {
       throw new MalformedError("Malformed");
-      return;
     }
     for (var i=0; i<data.answers.length; i++) {
       if (typeof data.answers[i] != "object" || typeof data.answers[i].key != "string" || typeof data.answers[i].idx != "number" || typeof data.answers[i].answer == "undefined") {
         throw new MalformedError("Malformed");
-        return;
       }
     }
 
@@ -875,7 +870,6 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
         || typeof data.answer == "undefined" || typeof data.serial != "number"
         || typeof data.idx != "number") {
       throw new MalformedError("Malformed");
-      return;
     }
 
     if (typeof this.listeners['answer'][data.to] == 'object' && typeof this.listeners['answer'][data.to][data.serial] == 'function') {
@@ -887,7 +881,6 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     } else {
       // Unexpected.
       throw new UnexpectedError("Unexpected");
-      return;
     }
     break;
 
@@ -902,7 +895,6 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
 
     if (typeof data.from != "string" || typeof data.serial != "number" || typeof data.idx != "number" || typeof data.offer == "undefined") {
       throw new MalformedError("Malformed");
-      return;
     }
 
     this.asCraig.recvOffer(data.from, data.offer, data.serial, data.idx, this.asCraig.sendAnswer.bind(this.asCraig, data.from, data.serial, data.idx));
@@ -916,7 +908,6 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // If Alice sent it, it won't have the 'idx'.
     if (typeof data.from != "string" || typeof data.to != "string" || typeof data.candidate != "object") {
       throw new MalformedError("Malformed");
-      return;
     }
 
     // Someone should establish listeners, and should establish timeouts to get
@@ -952,7 +943,8 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     if (data.to == this.dht.id) {
       // This is either Alice or Craig format.
 
-      if (typeof data.serial == "undefined" || typeof data.idx == "undefined" || typeof data.candidate) {
+      debugger;
+      if (typeof data.serial == "number" && typeof data.idx == "number" && typeof data.candidate == "object") {
         // This is Alice format.  Act as Alice.
         // Alice format
         // this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][fromIdx] = this.recvIceCandidate.bind(this, searchSerial, fromIdx, peer);
@@ -964,14 +956,21 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
         }
 
         this.listeners['ICECandidate'][this.dht.id][data.serial][data.idx](data.candidate);
-      } else if (typeof this.listeners['ICECandidate'][fromKey] != "undefined"
-        && this.listeners['ICECandidate'][fromKey][this.dht.id] != "undefined") {
-        // This is Craig format.  Act as Craig.
-        // Craig format
-        // this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id] = this.recvIceCandidate.bind(this, aliceKey, alicePeer);
+      } else if (typeof data.serial == "undefined" && typeof data.idx == "undefined" && typeof data.candidate == "object") {
+        if (typeof this.listeners['ICECandidate'][fromKey] != "undefined"
+          && this.listeners['ICECandidate'][fromKey][this.dht.id] != "undefined") {
+          // This is Craig format.  Act as Craig.
+          // Craig format
+          // this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id] = this.recvIceCandidate.bind(this, aliceKey, alicePeer);
 
-        // This is Craig format.  Act as Craig.
-        this.listeners['ICECandidate'][fromKey][this.dht.id](data.candidate);
+          // This is Craig format.  Act as Craig.
+          this.listeners['ICECandidate'][fromKey][this.dht.id](data.candidate);
+        } else {
+          throw new UnexpectedError("Unexpected ICECandidate.");
+        }
+      } else {
+        // This is not Alice or Craig format.  It is malformed.
+        throw new MalformedError("Malformed ICECandidate.");
       }
     }
 
