@@ -992,11 +992,79 @@ describe("KademliaRemoteNode", function () {
   });
 
   describe("#onMessage", function () {
-    it("should throw UnexpectedError if we get an answer when we didn't send an offer.", function () {
-      assert(0);
+    it("should throw UnexpectedError if we get a FOUND_NODE with no search active.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var participants = kademlia.makePair();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+
+      // In the participants object, I have things called 'alice' and 'bob'.
+      // What they mean is that alice has a connection to bob, so when alice
+      // sends something, bob gets it.
+      // Here, I have "bobAccordingToAlice".  This is an object belonging to
+      // the person of alice.  When you instruct it to send something, bob
+      // should get it.
+      // Therefore, bobAccordingToAlice should have participants.alice, and
+      // vice versa.
+      // That is, when we say "according to", that is the person we are.  They
+      // should possess the particpant named after them.
+      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
+      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
+
+      alice._insertNode(bobAccordingToAlice);
+      bob._insertNode(aliceAccordingToBob);
+
+      // These handlers would normally be added as part of the kademlia
+      // process.  There will also be a process to add them when bootstrapping
+      // the network.  For now, I am bootstrapping by hand.
+      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+        bobAccordingToAlice.onMessage(bob.id, data);
+      });
+      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+        aliceAccordingToBob.onMessage(alice.id, data);
+      });
+
+      // Now actually start communication.
+      participants.alice.createOffer();
+      kademlia.mockTime.advance(5);
+
+      // Send an unexpected answer from Bob to Alice.
+      // {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "serial":<the original serial number Alice sent>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
+
+      var gotUnexpected = false;
+
+      try {
+        participants.bob.send('dht', {
+          op: 'FOUND_NODE',
+          key: '12345678',
+          serial: 999,
+          answers: [
+            {
+              key: '87654321',
+              idx: 0,
+              answer: "Unexpected!",
+            },
+          ],
+        });
+
+        kademlia.mockTime.advance(10);
+      } catch (e) {
+        if (e instanceof kademlia.UnexpectedError) {
+          gotUnexpected = true;
+        } else {
+          throw e;
+        }
+      }
+
+      assert(gotUnexpected);
     });
 
-    it("should throw UnexpectedError if we get a FOUND_NODE with no search active.", function () {
+    it("should throw UnexpectedError if we get an answer when we didn't send an offer.", function () {
       assert(0);
     });
 
