@@ -943,8 +943,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     if (data.to == this.dht.id) {
       // This is either Alice or Craig format.
 
-      debugger;
-      if (typeof data.serial == "number" && typeof data.idx == "number" && typeof data.candidate == "object") {
+      if (typeof data.serial == "number" && typeof data.idx == "number") {
         // This is Alice format.  Act as Alice.
         // Alice format
         // this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][fromIdx] = this.recvIceCandidate.bind(this, searchSerial, fromIdx, peer);
@@ -977,14 +976,24 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // Bob format
     // this.node.listeners['ICECandidate'][fromKey][toKey] = this.forwardIceCandidate.bind(this, fromKey, toKey);
 
-    else if (typeof this.listeners['ICECandidate'][fromKey] != "undefined" 
-        && typeof this.listeners['ICECandidate'][fromKey][data.to] != "undefined") {
-      // This is Bob format.  Act as Bob.
-      this.listeners['ICECandidate'][fromKey][data.to](data.candidate, data.serial, data.idx);
-    }
-
     else {
-      throw new UnexpectedError("Unexpected ICECandidate");
+      // This is Bob format.  Act as Bob.
+
+      // It may have come from Alice or Craig.  If it came from Craig, it would look like this:
+      // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
+      // If it came from Alice, it would look like this:
+      // {"op":"ICECandidate", "from":<hex rep of Alice's key>, "to":<hex rep of Craig's key>, "candidate":<whatever the ICE candidate thing is>}
+      if ((typeof data.serial != "number" && typeof data.serial != "undefined")
+          || (typeof data.idx != "number" && typeof data.idx != "undefined")) {
+        throw new MalformedError("Malformed ICECandidate");
+      }
+
+      if (typeof this.listeners['ICECandidate'][fromKey] != "undefined" 
+          && typeof this.listeners['ICECandidate'][fromKey][data.to] != "undefined") {
+        this.listeners['ICECandidate'][fromKey][data.to](data.candidate, data.serial, data.idx);
+      } else {
+        throw new UnexpectedError("Unexpected ICECandidate");
+      }
     }
     
     break;
