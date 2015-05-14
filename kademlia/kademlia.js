@@ -144,7 +144,7 @@ KademliaDHT.prototype.addListener = function (op, from, callback) {
  * @param object msg The message that was sent to us.
  */
 KademliaDHT.prototype.onMessage = function (from, msg) {
-  if (typeof msg.op != "string") {
+  if (typeof msg != "object" && typeof msg.op != "string") {
     throw new MalformedError("Malformed");
   }
 
@@ -155,6 +155,10 @@ KademliaDHT.prototype.onMessage = function (from, msg) {
     listeners = this.listeners[op];
   } else if (typeof this.listeners[op] == "object") {
     listeners = this.listeners[op][from];
+  }
+
+  if (listeners == null) {
+    throw new UnexpectedError("Unexpected message.");
   }
 
   var stop = false;
