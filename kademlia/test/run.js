@@ -981,5 +981,35 @@ describe("KademliaRemoteNode", function () {
 
       assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
     });
+
+    it("should be able to have two concurrent searches", function () {
+      assert(0);
+    });
+
+    it("should only open one connection if the answer to concurrent searches overlaps", function () {
+      assert(0);
+    });
+  });
+
+  describe("#onMessage", function () {
+    it("should throw UnexpectedError if we get an answer when we didn't send an offer.", function () {
+      assert(0);
+    });
+
+    it("should throw UnexpectedError if we get a FOUND_NODE with no search active.", function () {
+      assert(0);
+    });
+
+    it("should throw UnexpectedError if Alice gets an ICECandidate when we weren't trying to open a connection.", function () {
+      assert(0);
+    });
+  });
+});
+
+describe("KademliaRemoteNodeAlice", function () {
+  describe("#_recvFoundNode", function () {
+    it("should not open new connections to peers we already know.", function () {
+      assert(0);
+    });
   });
 });
