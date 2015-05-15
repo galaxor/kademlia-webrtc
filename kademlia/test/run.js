@@ -85,6 +85,45 @@ function makePair(mockTime, WebRTCPeer) {
   };
 }
 
+/**
+ * Manually introduce two peers to each other.
+ */
+function matchMake(aliceDht, bobDht, kademlia) {
+  // In the participants object, I have things called 'alice' and 'bob'.
+  // What they mean is that alice has a connection to bob, so when alice
+  // sends something, bob gets it.
+  // Here, I have "bobAccordingToAlice".  This is an object belonging to
+  // the person of alice.  When you instruct it to send something, bob
+  // should get it.
+  // Therefore, bobAccordingToAlice should have participants.alice, and
+  // vice versa.
+  // That is, when we say "according to", that is the person we are.  They
+  // should possess the particpant named after them.
+  var participants = kademlia.makePair();
+
+  participants.bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobDht.id, peer: participants.alice});
+  participants.aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceDht.id, peer: participants.bob});
+
+  aliceDht._insertNode(participants.bobAccordingToAlice);
+  bobDht._insertNode(participants.aliceAccordingToBob);
+
+  // These handlers would normally be added as part of the kademlia
+  // process.  There will also be a process to add them when bootstrapping
+  // the network.  For now, I am bootstrapping by hand.
+  participants.bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+    participants.bobAccordingToAlice.onMessage(bobDht.id, data);
+  });
+  participants.aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
+    participants.aliceAccordingToBob.onMessage(aliceDht.id, data);
+  });
+
+  // Now actually start communication.
+  participants.alice.createOffer();
+  kademlia.mockTime.advance(5);
+
+  return participants;
+}
+
 describe("mock-wrtc", function () {
   it("can simulate basic webrtc data behavior", function () {
     // We instantiate kademlia because that'll give us WebRTCPeer and timers
@@ -902,11 +941,6 @@ describe("KademliaRemoteNode", function () {
     it("should be able to make a complete round trip.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-      var participants2 = kademlia.makePair();
-
-      assert.equal(participants.mockTime, participants2.mockTime);
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
       var craigKey = '40000000';
@@ -915,59 +949,15 @@ describe("KademliaRemoteNode", function () {
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
       var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
-
-      // Fill in Bob with some other nodes.
-      var craigAccordingToBob = new kademlia.KademliaRemoteNode({id: craigKey, peer: participants2.alice});
-      var bobAccordingToCraig = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants2.bob});
-
-      bob._insertNode(craigAccordingToBob);
-      craig._insertNode(bobAccordingToCraig);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      craigAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        craigAccordingToBob.onMessage(craig.id, data);
-      });
-      bobAccordingToCraig.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToCraig.onMessage(bob.id, data);
-      });
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
 
       // Now we have an Alice who knows about Bob, and a Bob, who knows about
       // Alice and Craig.  Let's see what happens when Alice asks for some
       // friends.
       var responseCraigs = null;
 
-      bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
         responseCraigs = craigs;
       });
 
@@ -1007,35 +997,7 @@ describe("KademliaRemoteNode", function () {
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send an unexpected answer from Bob to Alice.
       // {"op":"FOUND_NODE", "key":<hex representation of key that was originally requested>, "serial":<the original serial number Alice sent>, "answers":[{"key":<hex rep of Craig's key>, "idx":<idx>, "answer":<answer>}]}
@@ -1071,43 +1033,13 @@ describe("KademliaRemoteNode", function () {
     it("should throw MalformedError if Craig gets a malformed offer.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send a malformed message from Alice to Bob.
       // {"op":"offer", "from":<hex representation of Alice's id>, "offer":<offer>, "serial":<the serial number that Alice sent>, "idx":<a number>}
@@ -1212,43 +1144,13 @@ describe("KademliaRemoteNode", function () {
     it("should throw UnexpectedError if Alice gets an ICECandidate when we weren't trying to open a connection.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send an unexpected answer from Bob to Alice.
       // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
@@ -1280,43 +1182,13 @@ describe("KademliaRemoteNode", function () {
     it("should throw UnexpectedError if Bob gets an unexpected ICECandidate.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send an unexpected answer from Bob to Alice.
       // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
@@ -1348,43 +1220,13 @@ describe("KademliaRemoteNode", function () {
     it("should throw MalformedError if Alice gets a malformed ICECandidate.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send a malformed ICE candidate from Bob to Alice.
       // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
@@ -1518,43 +1360,13 @@ describe("KademliaRemoteNode", function () {
     it("should throw MalformedError if Bob gets a malformed ICECandidate from Alice.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send a malformed ICE candidate from Bob to Alice.
       // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
@@ -1632,43 +1444,13 @@ describe("KademliaRemoteNode", function () {
     it("should throw MalformedError if Bob gets a malformed ICECandidate from Craig.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send a malformed ICE candidate from Bob to Alice.
       // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
@@ -1802,43 +1584,13 @@ describe("KademliaRemoteNode", function () {
     it("should throw MalformedError if we get a completely unexpected message.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send a malformed ICE candidate from Bob to Alice.
       // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
@@ -1868,43 +1620,13 @@ describe("KademliaRemoteNode", function () {
     it("should throw MalformedError if we get a message that is not an object with an 'op' field.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Send a malformed message from Alice to Bob.
 
@@ -1948,6 +1670,25 @@ describe("KademliaRemoteNode", function () {
 describe("KademliaRemoteNodeAlice", function () {
   describe("#_recvFoundNode", function () {
     it("should not open new connections to peers we already know.", function () {
+      // Alice will have a connection to Bob and Craig.  Bob will have a
+      // connection to Craig.
+      // Alice will ask Bob for nodes around Craig.  She should detect that the
+      // answer contains Craig, whom she already knows, and not open a new
+      // connection.
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '80000008';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      matchMake(alice, bob, kademlia);
+      matchMake(alice, craig, kademlia);
+      matchMake(bob, craig, kademlia);
+
       assert(0);
     });
   });
