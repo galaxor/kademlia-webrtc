@@ -770,33 +770,13 @@ describe("KademliaRemoteNode", function () {
     it("should send a well-formed FIND_NODE request over the wire.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       var bobLog = [];
 
@@ -804,7 +784,7 @@ describe("KademliaRemoteNode", function () {
         bobLog.push(data);
       });
 
-      bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (answers) {
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (answers) {
         // Do nothing.  I'm just checking if I sent the right stuff.
       });
 
@@ -839,43 +819,13 @@ describe("KademliaRemoteNode", function () {
     it("should receive a bucket full of answers in response.", function () {
       var kademlia = mockTimedKademlia();
 
-      var participants = kademlia.makePair();
-
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
 
-      // In the participants object, I have things called 'alice' and 'bob'.
-      // What they mean is that alice has a connection to bob, so when alice
-      // sends something, bob gets it.
-      // Here, I have "bobAccordingToAlice".  This is an object belonging to
-      // the person of alice.  When you instruct it to send something, bob
-      // should get it.
-      // Therefore, bobAccordingToAlice should have participants.alice, and
-      // vice versa.
-      // That is, when we say "according to", that is the person we are.  They
-      // should possess the particpant named after them.
-      var bobAccordingToAlice = new kademlia.KademliaRemoteNode({id: bobKey, peer: participants.alice});
-      var aliceAccordingToBob = new kademlia.KademliaRemoteNode({id: aliceKey, peer: participants.bob});
-
-      alice._insertNode(bobAccordingToAlice);
-      bob._insertNode(aliceAccordingToBob);
-
-      // These handlers would normally be added as part of the kademlia
-      // process.  There will also be a process to add them when bootstrapping
-      // the network.  For now, I am bootstrapping by hand.
-      bobAccordingToAlice.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        bobAccordingToAlice.onMessage(bob.id, data);
-      });
-      aliceAccordingToBob.peer.addChannelMessageHandler('dht', function (peer, channel, data) {
-        aliceAccordingToBob.onMessage(alice.id, data);
-      });
-
-      // Now actually start communication.
-      participants.alice.createOffer();
-      kademlia.mockTime.advance(5);
+      var participants = matchMake(alice, bob, kademlia);
 
       // Fill in Bob with some other nodes.
       var keys = [
@@ -908,14 +858,14 @@ describe("KademliaRemoteNode", function () {
       var response = null;
 
       // We won't be getting real answers, so we won't be able to actually feed them in to WebRTCPeer.recvAnswer.  Therefore, we will replace _recvFoundNode and use it to 
-      bobAccordingToAlice.asAlice._recvFoundNode = function (searchedKey, searchSerial, peers, callback, answers) {
+      participants.bobAccordingToAlice.asAlice._recvFoundNode = function (searchedKey, searchSerial, peers, callback, answers) {
         response = [];
         for (var i=0; i<answers.length; i++) {
           response.push(answers[i].answer);
         }
       };
 
-      bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
         // We shouldn't get here because this callback is normally called by
         // _recvFoundNode, but we've replaced that.
         assert(0 == "This shouldn't have been called");
@@ -988,8 +938,6 @@ describe("KademliaRemoteNode", function () {
   describe("#onMessage", function () {
     it("should throw UnexpectedError if we get a FOUND_NODE with no search active.", function () {
       var kademlia = mockTimedKademlia();
-
-      var participants = kademlia.makePair();
 
       var aliceKey = '00000000';
       var bobKey   = '10000000';
