@@ -38,6 +38,7 @@ function mockTimedKademlia(existingMockTime) {
   );
 
   kademlia.wrtc = wrtc;
+  kademlia.WebRTCPeer = WebRTCPeer;
 
   kademlia.mockTime = mockTime;
 
@@ -1633,11 +1634,31 @@ describe("KademliaRemoteNodeAlice", function () {
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
       var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
 
-      matchMake(alice, bob, kademlia);
-      matchMake(alice, craig, kademlia);
-      matchMake(bob, craig, kademlia);
+      var participantsAB = matchMake(alice, bob, kademlia);
+      var participantsAC = matchMake(alice, craig, kademlia);
+      var participantsBC = matchMake(bob, craig, kademlia);
 
-      assert(0);
+      
+      var responseCraigs = null;
+
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      var dataChannelOpenCalled = false;
+
+      kademlia.WebRTCPeer.prototype._dataChannelOpen = function (channel) {
+        dataChannelOpenCalled = true;
+      };
+
+      debugger;
+      kademlia.mockTime.advance(100);
+
+      assert.deepEqual(Object.keys(responseCraigs), [craigKey]);
+      assert.equal(responseCraigs[craigKey], participantsAC.bobAccordingToAlice);
+      assert(!dataChannelOpenCalled);
     });
   });
+
+  // XXX make sure the lists of listeners for FOUND_NODE, ICECandidate, and answer are empty after a successful FIND_NODE.
 });
