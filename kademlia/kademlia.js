@@ -776,7 +776,6 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
           remoteNode.onMessage(key, data);
         };
 
-        debugger;
         remoteNode.peer.addChannelMessageHandler('dht', onMessage);
 
         replyPeers.awaitingReply--;
