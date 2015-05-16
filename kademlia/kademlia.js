@@ -738,11 +738,12 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       // We will need a sendLocalIce handler.  We can define that now that we
       // know the kademlia id of the remote node.
       var bob = this.node.peer;
+      var dht = this.node.dht;
 
       var sendLocalIce = function (peer, candidate) {
         bob.send('dht', {
           op: "ICECandidate",
-          from: this.node.dht.id,
+          from: dht.id,
           to: key,
           candidate: candidate,
         });
@@ -789,6 +790,8 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       };
 
       peers[idx].addDataChannelHandler('dht', onOpen);
+
+      peers[idx].recvAnswer(answer);
     } else {
       // We already knew about this peer.  Just put the existing KademliaRemoteNode in the list.
       replyPeers.peers[key] = this.node.dht.knownPeers[key];
@@ -959,14 +962,14 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
 
         this.listeners['ICECandidate'][this.dht.id][data.serial][data.idx](data.candidate);
       } else if (typeof data.serial == "undefined" && typeof data.idx == "undefined" && typeof data.candidate == "object") {
-        if (typeof this.listeners['ICECandidate'][fromKey] != "undefined"
-          && this.listeners['ICECandidate'][fromKey][this.dht.id] != "undefined") {
+        if (typeof this.listeners['ICECandidate'][data.from] != "undefined"
+          && this.listeners['ICECandidate'][data.from][this.dht.id] != "undefined") {
           // This is Craig format.  Act as Craig.
           // Craig format
           // this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id] = this.recvIceCandidate.bind(this, aliceKey, alicePeer);
 
           // This is Craig format.  Act as Craig.
-          this.listeners['ICECandidate'][fromKey][this.dht.id](data.candidate);
+          this.listeners['ICECandidate'][data.from][this.dht.id](data.candidate);
         } else {
           throw new UnexpectedError("Unexpected ICECandidate.");
         }
@@ -1192,8 +1195,8 @@ KademliaRemoteNodeCraig.prototype.recvIceCandidate = function (aliceKey, alicePe
   
   // Refresh the timeout.  We've heard from them now, so don't give up on them
   // until they've gone silent for the full iceTimeout ms from now.
-  clearTimeout(this.iceTimeouts[aliceKey][this.node.dht.id]);
-  this.node.iceTimeouts[aliceKey][this.node.dht.id] = setTimeout(this._cancelIceListener.bind(this, searchSerial, idx), this.node.iceTimeout);
+  clearTimeout(this.node.iceTimeouts[aliceKey][this.node.dht.id]);
+  this.node.iceTimeouts[aliceKey][this.node.dht.id] = setTimeout(this._cancelIceListener.bind(this, aliceKey), this.node.iceTimeout);
 };
 
 /**
