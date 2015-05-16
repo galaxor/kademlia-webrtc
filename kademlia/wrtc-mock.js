@@ -42,8 +42,6 @@ wrtc.RTCPeerConnection.prototype.setRemoteDescription = function (sessionDescrip
     successCallback();
 
     peer.generateIceCandidate();
-
-    peer.openDataChannels();
   }, 0);
 };
 
