@@ -1651,7 +1651,6 @@ describe("KademliaRemoteNodeAlice", function () {
         dataChannelOpenCalled = true;
       };
 
-      debugger;
       kademlia.mockTime.advance(100);
 
       assert.deepEqual(Object.keys(responseCraigs), [craigKey]);
