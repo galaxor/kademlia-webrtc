@@ -740,11 +740,16 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       var bob = this.node.peer;
       var dht = this.node.dht;
 
+      // Apparently there is some sort of scope problem if I use the variable
+      // "key" directly; when these callbacks are actually called, "key" will
+      // be set to the last value it took, not the value it took when these
+      // callbacks were created.
+      var craigKey = key;
       var sendLocalIce = function (peer, candidate) {
         bob.send('dht', {
           op: "ICECandidate",
           from: dht.id,
-          to: key,
+          to: craigKey,
           candidate: candidate,
         });
       };
@@ -766,15 +771,15 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
         // XXX
 
         var remoteNode = new KademliaRemoteNode({
-          id: key,
+          id: craigKey,
           peer: peer,
         });
 
-        replyPeers.peers[key] = remoteNode;
+        replyPeers.peers[craigKey] = remoteNode;
 
         // This is a great time to add the onMessage callback!
         var onMessage = function (peer, channel, data) {
-          remoteNode.onMessage(key, data);
+          remoteNode.onMessage(craigKey, data);
         };
 
         remoteNode.peer.addChannelMessageHandler('dht', onMessage);
@@ -933,7 +938,9 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // If I added listeners, whether as Alice, Bob, or Craig, they will all be
     // in the this.listeners['ICECandidate'] array.
     // But they each add them in a slightly different format, and the callback
-    // has a slightly different signature.
+    // has a slightly different signature.  I copy/pasted their code snippets
+    // in here for reference on how to find them in the listeners array and how
+    // to call them.
 
     // Alice format
     // this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][fromIdx] = this.recvIceCandidate.bind(this, searchSerial, fromIdx, peer);
@@ -952,6 +959,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       if (typeof data.serial == "number" && typeof data.idx == "number") {
         // This is Alice format.  Act as Alice.
         // Alice format
+        // The listener was placed into the listeners array like so:
         // this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][fromIdx] = this.recvIceCandidate.bind(this, searchSerial, fromIdx, peer);
 
         if (typeof this.listeners['ICECandidate'][this.dht.id] == "undefined"
@@ -966,6 +974,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
           && this.listeners['ICECandidate'][data.from][this.dht.id] != "undefined") {
           // This is Craig format.  Act as Craig.
           // Craig format
+          // The listener was placed into the listeners array like so:
           // this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id] = this.recvIceCandidate.bind(this, aliceKey, alicePeer);
 
           // This is Craig format.  Act as Craig.
@@ -979,11 +988,12 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       }
     }
 
-    // Bob format
-    // this.node.listeners['ICECandidate'][fromKey][toKey] = this.forwardIceCandidate.bind(this, fromKey, toKey);
-
     else {
       // This is Bob format.  Act as Bob.
+      // Bob format
+      // The listener was placed into the listeners array like so:
+      // this.node.listeners['ICECandidate'][fromKey][toKey] = this.forwardIceCandidate.bind(this, fromKey, toKey);
+
 
       // It may have come from Alice or Craig.  If it came from Craig, it would look like this:
       // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}

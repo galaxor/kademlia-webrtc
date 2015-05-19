@@ -930,10 +930,6 @@ describe("KademliaRemoteNode", function () {
     it("should only open one connection if the answer to concurrent searches overlaps", function () {
       assert(0);
     });
-
-    it("should use existing connections to any known peers that are returned.", function () {
-      assert(0);
-    });
   });
 
   describe("#onMessage", function () {
@@ -1656,6 +1652,51 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.deepEqual(Object.keys(responseCraigs), [craigKey]);
       assert.equal(responseCraigs[craigKey], participantsAC.bobAccordingToAlice);
       assert(!dataChannelOpenCalled);
+    });
+
+    it("should be able to use a mix of known and unknown peers.", function () {
+      // Alice will have a connection to Bob and Craig.  Bob will have a
+      // connection to Craig and Denise.
+      // Alice will ask Bob for nodes around Craig.  She should detect that the
+      // answer contains Craig, whom she already knows, and not open a new
+      // connection.  She should, however, open a connection to Denise.
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '80000008';
+      var deniseKey = '80000007';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4});
+
+      var participantsAB = matchMake(alice, bob, kademlia);
+      var participantsAC = matchMake(alice, craig, kademlia);
+      var participantsBC = matchMake(bob, craig, kademlia);
+      var participantsBD = matchMake(bob, denise, kademlia);
+
+      
+      var responseCraigs = null;
+
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        debugger;
+        responseCraigs = craigs;
+      });
+
+      var dataChannelOpenCalled = 0;
+
+      participantsBD.bobAccordingToAlice.peer.addDataChannelHandler(function (peer, channel) {
+        dataChannelOpenCalled++;
+      });
+
+      kademlia.mockTime.advance(100);
+
+      assert.deepEqual(Object.keys(responseCraigs).sort(), [craigKey, deniseKey].sort());
+      assert(responseCraigs[craigKey] == participantsAC.bobAccordingToAlice);
+      assert(responseCraigs[deniseKey] == participantsBD.bobAccordingToAlice);
+      assert.equal(dataChannelOpenCalled, 1);
     });
   });
 
