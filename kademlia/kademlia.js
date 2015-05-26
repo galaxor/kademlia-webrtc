@@ -745,14 +745,18 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       // be set to the last value it took, not the value it took when these
       // callbacks were created.
       var craigKey = key;
-      var sendLocalIce = function (peer, candidate) {
-        bob.send('dht', {
-          op: "ICECandidate",
-          from: dht.id,
-          to: craigKey,
-          candidate: candidate,
-        });
-      };
+
+      var sendLocalIce = (function (coolKey) {
+        var craigKey = coolKey;
+        return function (peer, candidate) {
+          bob.send('dht', {
+            op: "ICECandidate",
+            from: dht.id,
+            to: craigKey,
+            candidate: candidate,
+          });
+        };
+      })(key);
       peers[idx].addSendLocalIceCandidateHandler(sendLocalIce);
 
       // Finally, we define a timeout, after which point we will give up on the
@@ -766,33 +770,35 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       // of nodes to return, once we've established communication.
       // Also, check if this completes the set of peers we were waiting for replies from.
       // If it does, return the set.
-      var onOpen = function (peer, channel) {
-        // We can stop listening for ICE Candidates from this peer.
-        // XXX
+      var onOpen = (function (craigKey) {
+        return function (peer, channel) {
+          // We can stop listening for ICE Candidates from this peer.
+          // XXX
 
-        var remoteNode = new KademliaRemoteNode({
-          id: craigKey,
-          peer: peer,
-        });
+          var remoteNode = new KademliaRemoteNode({
+            id: craigKey,
+            peer: peer,
+          });
 
-        replyPeers.peers[craigKey] = remoteNode;
+          replyPeers.peers[craigKey] = remoteNode;
 
-        // This is a great time to add the onMessage callback!
-        var onMessage = function (peer, channel, data) {
-          remoteNode.onMessage(craigKey, data);
+          // This is a great time to add the onMessage callback!
+          var onMessage = function (peer, channel, data) {
+            remoteNode.onMessage(craigKey, data);
+          };
+
+          remoteNode.peer.addChannelMessageHandler('dht', onMessage);
+
+          replyPeers.awaitingReply--;
+          if (replyPeers.awaitingReply <= 0) {
+            // All the peers have replied.  Return the full set.
+            // Also, get rid of the timeout.
+            clearTimeout(timeout);
+            // XXX We can deregister the FOUND_NODE listener before calling the callback.
+            callback(replyPeers.peers);
+          }
         };
-
-        remoteNode.peer.addChannelMessageHandler('dht', onMessage);
-
-        replyPeers.awaitingReply--;
-        if (replyPeers.awaitingReply <= 0) {
-          // All the peers have replied.  Return the full set.
-          // Also, get rid of the timeout.
-          clearTimeout(timeout);
-          // XXX We can deregister the FOUND_NODE listener before calling the callback.
-          callback(replyPeers.peers);
-        }
-      };
+      })(craigKey);
 
       peers[idx].addDataChannelHandler('dht', onOpen);
 
