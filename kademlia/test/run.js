@@ -927,6 +927,50 @@ describe("KademliaRemoteNode", function () {
       assert(0);
     });
 
+    it("should be able to meet two new peers", function () {
+      // Alice will have a connection to Bob and Craig.  Bob will have a
+      // connection to Craig and Denise.
+      // Alice will ask Bob for nodes around Craig.  She should detect that the
+      // answer contains Craig, whom she already knows, and not open a new
+      // connection.  She should, however, open a connection to Denise.
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '80000008';
+      var deniseKey = '80000007';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4});
+
+      var participantsAB = matchMake(alice, bob, kademlia);
+      var participantsBC = matchMake(bob, craig, kademlia);
+      var participantsBD = matchMake(bob, denise, kademlia);
+
+      
+      var responseCraigs1 = null;
+
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs1 = craigs;
+      });
+
+      var dataChannelOpenCalled = 0;
+
+      var origDataChannelOpen = kademlia.WebRTCPeer.prototype._dataChannelOpen;
+
+      kademlia.WebRTCPeer.prototype._dataChannelOpen = function (channel) {
+        dataChannelOpenCalled++;
+        origDataChannelOpen.call(this, channel);
+      };
+
+      kademlia.mockTime.advance(100);
+
+      assert.deepEqual(Object.keys(responseCraigs1).sort(), [craigKey, deniseKey].sort());
+      assert.equal(dataChannelOpenCalled, 2);
+    });
+
     it("should only open one connection if the answer to concurrent searches overlaps", function () {
       assert(0);
     });
