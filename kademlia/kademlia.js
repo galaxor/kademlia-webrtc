@@ -761,16 +761,18 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
 
       // Finally, we define a timeout, after which point we will give up on the
       // other peers and just return what we've got.
-      var timeout = setTimeout(function () {
-        // XXX We can deregister the FOUND_NODE listener before calling the callback.
-        callback(replyPeers.peers);
-      }, this.node.dht.findNodeTimeout);
+      var timeout = setTimeout((function (callback) {
+        return function () {
+          // XXX We can deregister the FOUND_NODE listener before calling the callback.
+          callback(replyPeers.peers);
+        };
+      })(callback), this.node.dht.findNodeTimeout);
 
       // We also need to define an onOpen function which adds this to the set
       // of nodes to return, once we've established communication.
       // Also, check if this completes the set of peers we were waiting for replies from.
       // If it does, return the set.
-      var onOpen = (function (craigKey) {
+      var onOpen = (function (craigKey, callback) {
         return function (peer, channel) {
           // We can stop listening for ICE Candidates from this peer.
           // XXX
@@ -798,7 +800,7 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
             callback(replyPeers.peers);
           }
         };
-      })(craigKey);
+      })(craigKey, callback);
 
       peers[idx].addDataChannelHandler('dht', onOpen);
 
@@ -818,6 +820,10 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
   // But if we knew about everybody already, we don't need to wait for
   // anything.  Just call the callback.
   if (replyPeers.awaitingReply == 0) {
+    // All the peers have replied.  Return the full set.
+    // Also, get rid of the timeout.
+    clearTimeout(timeout);
+
     // XXX We can deregister the FOUND_NODE listener before calling the callback.
     callback(replyPeers.peers);
   }
