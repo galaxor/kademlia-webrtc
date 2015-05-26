@@ -1681,21 +1681,21 @@ describe("KademliaRemoteNodeAlice", function () {
       var responseCraigs = null;
 
       participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
-        debugger;
         responseCraigs = craigs;
       });
 
       var dataChannelOpenCalled = 0;
 
-      participantsBD.bobAccordingToAlice.peer.addDataChannelHandler(function (peer, channel) {
-        dataChannelOpenCalled++;
-      });
+      var origDataChannelOpen = kademlia.WebRTCPeer.prototype._dataChannelOpen;
 
+      kademlia.WebRTCPeer.prototype._dataChannelOpen = function (channel) {
+        dataChannelOpenCalled++;
+        origDataChannelOpen.call(this, channel);
+      };
       kademlia.mockTime.advance(100);
 
       assert.deepEqual(Object.keys(responseCraigs).sort(), [craigKey, deniseKey].sort());
-      assert(responseCraigs[craigKey] == participantsAC.bobAccordingToAlice);
-      assert(responseCraigs[deniseKey] == participantsBD.bobAccordingToAlice);
+      assert(responseCraigs[craigKey].peer == participantsAC.bobAccordingToAlice.peer);
       assert.equal(dataChannelOpenCalled, 1);
     });
   });
