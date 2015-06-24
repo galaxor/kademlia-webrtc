@@ -107,6 +107,31 @@ function KademliaDHT(options) {
   // In that case, the message will be passed to the callbacks only if it is
   // from the peer whose id is from_addr.
   this.listeners = {};
+
+  // This tells us things about searches where we've gotten a FOUND_NODE but we
+  // still have to wait for communication to open.
+  // We identify the searches with the searchSerial.
+  // Each search we're waiting for has this structure:
+  // searchResolution[searchSerial] = {
+  //  awaitingReply: #, // The number of peers we still haven't heard from.
+  //  repliedPeers: {key: kademliaRemoteNode, ...}, // The peers who have replied.
+  //  timeout: timeOut, // When this timeout expires, give up on the rest of
+  //                    // the ones we're waiting for and return what we've got.
+  // }
+  this.searchResolution = {};
+
+  // We also keep track of peers we're waiting to hear from.  We keep track of
+  // them by key.  We keep track of which searches are waiting for them.
+  // It could be that two concurrent searches both attempt to initate
+  // communication with the same Craig, not knowing it's the same person.  In
+  // that case, a response from either should resolve both searches.
+  // Each pendingResponsePeer has this structure:
+  //   pendingResponsePeer[key] = {serial#: true, serial#: true, serial#: true}
+  // Each of those serial#s refers to a search.
+  // If a search gives up, it's going to have to remove itself from the list of
+  // searches that the peer will resolve.  If all the searches give up, that
+  // peer is no longer pending.
+  this.pendingResponsePeers = {};
 }
 
 /**
@@ -718,11 +743,24 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
   // An object that will gather the accumulating peers.
   // We keep track of how many peers we have yet to hear from.  When that
   // reaches zero, we can send the reply to the callback.
-  // The reply will be the contents of replyPeers.peers.
-  var replyPeers = {
-    awaitingReply: answers.length,
-    peers: {},
+  // The reply will be the contents of searchResolution[searchSerial].repliedPeers.
+  // Finally, we define a timeout, after which point we will give up on the
+  // other peers and just return what we've got.
+  this.node.dht.searchResolution[searchSerial] = {
+    awaitingReply: 0,
+    repliedPeers: {},
+    timeout: setTimeout((function (callback, node) {
+        return function () {
+          // XXX We can deregister the FOUND_NODE listener before calling the callback.
+          callback(node.dht.searchResolution[searchSerial].repliedPeers);
+
+          // This search is now complete.
+          delete node.dht.searchResolution[searchSerial];
+        };
+      })(callback), this.node.dht.findNodeTimeout, this.node),
+    callback: callback,
   };
+  debugger;
 
   for (var i=0; i<answers.length; i++) {
     var key = answers[i].key;
@@ -746,6 +784,16 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       // callbacks were created.
       var craigKey = key;
 
+      // We must keep track of which outstanding searches care about this peer.
+      // We do that with pendingResponsePeers.  If this peer responds to any of
+      // the searches that are waiting for it, that will go toward resolving
+      // all of the searches that are waiting for it.
+      if (typeof this.node.dht.pendingResponsePeers[craigKey] == "undefined") {
+        this.node.dht.pendingResponsePeers[craigKey] = {};
+      }
+      this.node.dht.pendingResponsePeers[craigKey][searchSerial] = true;
+      this.node.dht.searchResolution[searchSerial].awaitingReply++;
+
       var sendLocalIce = (function (coolKey) {
         var craigKey = coolKey;
         return function (peer, candidate) {
@@ -759,20 +807,12 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       })(key);
       peers[idx].addSendLocalIceCandidateHandler(sendLocalIce);
 
-      // Finally, we define a timeout, after which point we will give up on the
-      // other peers and just return what we've got.
-      var timeout = setTimeout((function (callback) {
-        return function () {
-          // XXX We can deregister the FOUND_NODE listener before calling the callback.
-          callback(replyPeers.peers);
-        };
-      })(callback), this.node.dht.findNodeTimeout);
-
       // We also need to define an onOpen function which adds this to the set
       // of nodes to return, once we've established communication.
-      // Also, check if this completes the set of peers we were waiting for replies from.
-      // If it does, return the set.
-      var onOpen = (function (craigKey, callback) {
+      // Also, check all the searches that are waiting for this peer.  Add this
+      // peer to the list of peers who have replied.  If this completes the set
+      // of peers that search was waiting for, return the set.
+      var onOpen = (function (craigKey, node) {
         return function (peer, channel) {
           // We can stop listening for ICE Candidates from this peer.
           // XXX
@@ -782,8 +822,6 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
             peer: peer,
           });
 
-          replyPeers.peers[craigKey] = remoteNode;
-
           // This is a great time to add the onMessage callback!
           var onMessage = function (peer, channel, data) {
             remoteNode.onMessage(craigKey, data);
@@ -791,24 +829,40 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
 
           remoteNode.peer.addChannelMessageHandler('dht', onMessage);
 
-          replyPeers.awaitingReply--;
-          if (replyPeers.awaitingReply <= 0) {
-            // All the peers have replied.  Return the full set.
-            // Also, get rid of the timeout.
-            clearTimeout(timeout);
-            // XXX We can deregister the FOUND_NODE listener before calling the callback.
-            callback(replyPeers.peers);
+          // Check all the searches that are waiting for this peer.  Add this
+          // peer to the list of peers who have replied.  If this completes the set
+          // of peers that search was waiting for, return the set.
+          var waitingSearches = Object.keys(node.dht.pendingResponsePeers[craigKey]);
+          delete node.dht.pendingResponsePeers[craigKey];
+          for (var i=0; i<waitingSearches.length; i++) {
+            var serial = waitingSearches[i];
+            debugger;
+            node.dht.searchResolution[serial].repliedPeers[craigKey] = remoteNode;
+
+            node.dht.searchResolution[serial].awaitingReply--;
+
+            if (node.dht.searchResolution[serial].awaitingReply <= 0) {
+              // All the peers have replied.  Return the full set.
+              // Also, get rid of the timeout.
+              clearTimeout(node.dht.searchResolution[serial].timeout);
+              // XXX We can deregister the FOUND_NODE listener before calling the callback.
+
+              node.dht.searchResolution[serial].callback(node.dht.searchResolution[serial].repliedPeers);
+
+              // This search is now complete.
+              debugger;
+              delete node.dht.searchResolution[serial];
+            }
           }
         };
-      })(craigKey, callback);
+      })(craigKey, this.node);
 
       peers[idx].addDataChannelHandler('dht', onOpen);
 
       peers[idx].recvAnswer(answer);
     } else {
       // We already knew about this peer.  Just put the existing KademliaRemoteNode in the list.
-      replyPeers.peers[key] = this.node.dht.knownPeers[key];
-      replyPeers.awaitingReply--;
+      this.node.dht.searchResolution[searchSerial].repliedPeers[key] = this.node.dht.knownPeers[key];
     }
   }
 
@@ -819,13 +873,17 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
   // onOpen callback, or by the timeout we set.
   // But if we knew about everybody already, we don't need to wait for
   // anything.  Just call the callback.
-  if (replyPeers.awaitingReply == 0) {
+  if (this.node.dht.searchResolution[searchSerial].awaitingReply == 0) {
     // All the peers have replied.  Return the full set.
     // Also, get rid of the timeout.
-    clearTimeout(timeout);
+    clearTimeout(this.node.dht.searchResolution[searchSerial].timeout);
 
     // XXX We can deregister the FOUND_NODE listener before calling the callback.
-    callback(replyPeers.peers);
+    this.node.dht.searchResolution[searchSerial].callback(this.node.dht.searchResolution[searchSerial].repliedPeers);
+
+    // This search is now complete.
+    debugger;
+    delete this.node.dht.searchResolution[searchSerial];
   }
 };
 
