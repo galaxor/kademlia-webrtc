@@ -1005,33 +1005,9 @@ describe("KademliaRemoteNode", function () {
 
       kademlia.mockTime.advance(100);
 
-      // XXX
-      // The problem here is that Craig stores the IceListeners addressed by
-      // the origin only, and doesn't use the search serial or the idx.
-      // (like this: this.listeners['ICECandidate'][data.from][this.dht.id])
-      // So when we set the second IceListener, it overrides the first one.
-      // Therefore, only one channel gets opened for each pair of (Alice, Craig)s.
-      // So, there's two possible ways to handle this:
-      // 1. We could have Craig store the ICE candidates using the serial/idx
-      //    as well.  That way, one channel would get opened for each triple
-      //    (Alice, Craig, SearchSerial).
-      //    What would happen in this case?  Would we replace one of them in the KnownPeers?
-      // 2. We could have Alice store things about the peers it's waiting on,
-      //    instead of just counting them.  That way, when a channel opens, it can
-      //    say "oh, that clears the following FindNode searches.
-      // Which way???
-
       assert.deepEqual(Object.keys(responseCraigs1).sort(), [craigKey, deniseKey].sort());
       assert.deepEqual(Object.keys(responseCraigs2).sort(), [craigKey, deniseKey].sort());
       assert.equal(dataChannelOpenCalled, 2);
-    });
-
-    it("behaves correctly when each of the timeouts times out", function () {
-      assert(0);
-    });
-
-    it("should only open one connection if the answer to concurrent searches overlaps", function () {
-      assert(0);
     });
   });
 
@@ -1800,6 +1776,76 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.deepEqual(Object.keys(responseCraigs).sort(), [craigKey, deniseKey].sort());
       assert(responseCraigs[craigKey].peer == participantsAC.bobAccordingToAlice.peer);
       assert.equal(dataChannelOpenCalled, 1);
+    });
+
+    it("should only open one connection if the answer to concurrent searches overlaps", function () {
+      // Alice will have a connection to Bob.
+      // Bob will have a connection to seven peers.  The peers will be in buckets like so:
+      // B1: [P1, P2, P3], B2: [P4], B3: [P5, P6, P7]
+      // Alice will launch two concurrent searches.  One on bucket B1, one on bucket B2.
+      // Therefore, the correct answers to the searches will be:
+      // [P1, P2, P3, P4]
+      // [P4, P5, P6, P7]
+      // The test is:  Was a connection opened to each peer exactly once, and
+      // most especially, did P4 correctly get one connection opened, and not
+      // 2?
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '10000000';
+      var bobKey   = '00000000';
+      var craigKeys = [
+        // bucket B1
+        '00010000', '00010001', '00010002',
+        // bucket B2
+        '00001000',
+        // bucket B3
+        '00000100', '00000101', '00000102'
+      ];
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+
+      var craigs = [];
+      for (var i=0; i<craigKeys.length; i++) {
+        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4}));
+        matchMake(bob, craigs[craigs.length-1], kademlia);
+      }
+
+      // Double-check my assumptions that they got into the right buckets.
+      assert.deepEqual(Object.keys(bob.buckets[8]), ['00000100', '00000101', '00000102']);
+      assert.deepEqual(Object.keys(bob.buckets[12]), ['00001000']);
+      assert.deepEqual(Object.keys(bob.buckets[16]), ['00010000', '00010001', '00010002']);
+
+      var participantsAB = matchMake(alice, bob, kademlia);
+      
+      var responseCraigs1 = null;
+      var responseCraigs2 = null;
+
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000100', function (craigs) {
+        responseCraigs1 = craigs;
+      });
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00001000', function (craigs) {
+        responseCraigs2 = craigs;
+      });
+
+      var dataChannelOpenCalled = 0;
+
+      var origDataChannelOpen = kademlia.WebRTCPeer.prototype._dataChannelOpen;
+
+      kademlia.WebRTCPeer.prototype._dataChannelOpen = function (channel) {
+        dataChannelOpenCalled++;
+        origDataChannelOpen.call(this, channel);
+      };
+
+      kademlia.mockTime.advance(100);
+
+      assert.deepEqual(Object.keys(responseCraigs1).sort(), ['00000100', '00000101', '00000102', '00001000'].sort());
+      assert.deepEqual(Object.keys(responseCraigs2).sort(), ['00001000', '00010000', '00010001', '00010002'].sort());
+      assert.equal(dataChannelOpenCalled, 7);
+    });
+
+    it("behaves correctly when each of the timeouts times out", function () {
+      assert(0);
     });
   });
 
