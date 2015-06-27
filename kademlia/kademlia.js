@@ -760,7 +760,6 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       })(callback), this.node.dht.findNodeTimeout, this.node),
     callback: callback,
   };
-  debugger;
 
   for (var i=0; i<answers.length; i++) {
     var key = answers[i].key;
@@ -836,7 +835,6 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
           delete node.dht.pendingResponsePeers[craigKey];
           for (var i=0; i<waitingSearches.length; i++) {
             var serial = waitingSearches[i];
-            debugger;
             node.dht.searchResolution[serial].repliedPeers[craigKey] = remoteNode;
 
             node.dht.searchResolution[serial].awaitingReply--;
@@ -850,7 +848,6 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
               node.dht.searchResolution[serial].callback(node.dht.searchResolution[serial].repliedPeers);
 
               // This search is now complete.
-              debugger;
               delete node.dht.searchResolution[serial];
             }
           }
@@ -882,7 +879,6 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
     this.node.dht.searchResolution[searchSerial].callback(this.node.dht.searchResolution[searchSerial].repliedPeers);
 
     // This search is now complete.
-    debugger;
     delete this.node.dht.searchResolution[searchSerial];
   }
 };
