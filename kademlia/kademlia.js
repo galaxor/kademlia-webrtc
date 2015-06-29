@@ -751,7 +751,7 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
     repliedPeers: {},
     timeout: setTimeout((function (callback, node) {
         return function () {
-          // XXX We can deregister the FOUND_NODE listener before calling the callback.
+          delete node.listeners['FOUND_NODE'][searchSerial];
           callback(node.dht.searchResolution[searchSerial].repliedPeers);
 
           // This search is now complete.
@@ -843,7 +843,7 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
               // All the peers have replied.  Return the full set.
               // Also, get rid of the timeout.
               clearTimeout(node.dht.searchResolution[serial].timeout);
-              // XXX We can deregister the FOUND_NODE listener before calling the callback.
+              delete node.listeners['FOUND_NODE'][searchSerial];
 
               node.dht.searchResolution[serial].callback(node.dht.searchResolution[serial].repliedPeers);
 
@@ -875,8 +875,9 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
     // Also, get rid of the timeout.
     clearTimeout(this.node.dht.searchResolution[searchSerial].timeout);
 
-    // XXX We can deregister the FOUND_NODE listener before calling the callback.
     this.node.dht.searchResolution[searchSerial].callback(this.node.dht.searchResolution[searchSerial].repliedPeers);
+
+    delete this.node.listeners['FOUND_NODE'][searchSerial];
 
     // This search is now complete.
     delete this.node.dht.searchResolution[searchSerial];
