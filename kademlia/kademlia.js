@@ -1481,4 +1481,4 @@ bitOps.xor = function (b1, b2) {
   return retval;
 };
 
-module.exports = exports = {KademliaDHT: KademliaDHT, KademliaRemoteNode: KademliaRemoteNode, bitOps: bitOps, MalformedError: MalformedError, UnexpectedError: UnexpectedError};
+module.exports = exports = {KademliaDHT: KademliaDHT, KademliaRemoteNode: KademliaRemoteNode, KademliaRemoteNodeAlice: KademliaRemoteNodeAlice, KademliaRemoteNodeBob: KademliaRemoteNodeBob, KademliaRemoteNodeCraig: KademliaRemoteNodeCraig, bitOps: bitOps, MalformedError: MalformedError, UnexpectedError: UnexpectedError};
