@@ -1853,6 +1853,79 @@ describe("KademliaRemoteNodeAlice", function () {
     });
   });
 
+  describe("#_cancelIceListener", function () {
+    it("should be able to cancel ice listener after ice timeout", function () {
+      // Alice has a connection to Bob.  Bob has a connection to Craig.  
+      // Alice sends a FIND_NODE to Bob.  Bob responds with a FOUND_NODE
+      // containing Craig.  Alice sends an offer to Craig.  Craig responds with
+      // an answer.  The channel never opens.  Does Craig correctly give up on
+      // Alice?
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '80000008';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participantsAB = matchMake(alice, bob, kademlia);
+      var participantsBC = matchMake(bob, craig, kademlia);
+
+      var peerAbandoned = [];
+
+      orig_recvFoundNode = participantsAB.aliceAccordingToBob._recvFoundNode;
+
+      kademlia.KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, searchSerial, peers, callback, answers) {
+        var orig = this;
+        setTimeout(function () {
+          orig_recvFoundNode.call(orig, searchedKey, searchSerial, peers, callback, answers);
+        }, 20000);
+      };
+
+      var orig_abandonPendingPeer = kademlia.KademliaRemoteNodeCraig.prototype.abandonPendingPeer;
+      kademlia.KademliaRemoteNodeCraig.prototype.abandonPendingPeer = function (aliceKey) {
+        peerAbandoned.push(aliceKey);
+        orig_abandonPendingPeer.call(this, aliceKey);
+      };
+
+      var orig_cancelIceListener = kademlia.KademliaRemoteNodeAlice.prototype._cancelIceListener;
+
+      kademlia.KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, idx) {
+        orig_cancelIceListener.call(this, searchSerial, idx);
+        
+        if (typeof this.node.iceTimeouts[this.node.dht.id][searchSerial] == "undefined") {
+          // We're in this situation after we've deleted the last callback.
+          assert.equal(typeof this.node.iceTimeouts[this.node.dht.id][searchSerial], "undefined");
+          assert.equal(typeof this.node.listeners['ICECandidate'][this.node.dht.id], "undefined");
+        } else {
+          assert.equal(typeof this.node.iceTimeouts[this.node.dht.id][searchSerial][idx], "undefined");
+          assert.equal(typeof this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][idx], "undefined");
+        }
+      };
+
+      var responseCraigs1 = null;
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000100', function (craigs) {
+        responseCraigs1 = craigs;
+      });
+
+      kademlia.mockTime.advance(5500);
+
+      assert.deepEqual(peerAbandoned, [aliceKey]);
+
+      kademlia.mockTime.advance(20000);
+
+      // _recvFoundNode will never complete, so it won't return the empty response.
+      assert.deepEqual(responseCraigs1, null);
+
+      debugger;
+      assert.deepEqual(participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], {});
+      assert.equal(typeof participantsAB.bobAccordingToAlice.listeners['ICECandidate'][participantsAB.bobAccordingToAlice.dht.id], "undefined");
+
+      assert.deepEqual(participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], {});
+    });
+  });
   // XXX make sure the lists of listeners for FOUND_NODE, ICECandidate, and answer are empty after a successful FIND_NODE.
 });
 
@@ -1905,6 +1978,59 @@ describe("KademliaRemoteNodeCraig", function () {
 
       // _recvFoundNode will never complete, so it won't return the empty response.
       assert.deepEqual(responseCraigs1, null);
+    });
+
+    it("should raise an UnexpectedError if an abandoned peer responds after all", function () {
+      // Alice has a connection to Bob.  Bob has a connection to Craig.  
+      // Alice sends a FIND_NODE to Bob.  Bob responds with a FOUND_NODE
+      // containing Craig.  Alice sends an offer to Craig.  Craig responds with
+      // an answer.  The channel never opens.  Does Craig correctly give up on
+      // Alice?
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '80000008';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participantsAB = matchMake(alice, bob, kademlia);
+      var participantsBC = matchMake(bob, craig, kademlia);
+
+      var peerAbandoned = [];
+
+      orig_recvFoundNode = participantsAB.aliceAccordingToBob._recvFoundNode;
+
+      kademlia.KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, searchSerial, peers, callback, answers) {
+        var orig = this;
+        setTimeout(function () {
+          orig_recvFoundNode.call(orig, searchedKey, searchSerial, peers, callback, answers);
+        }, 20000);
+      };
+
+      var orig_abandonPendingPeer = kademlia.KademliaRemoteNodeCraig.prototype.abandonPendingPeer;
+      kademlia.KademliaRemoteNodeCraig.prototype.abandonPendingPeer = function (aliceKey) {
+        peerAbandoned.push(aliceKey);
+        orig_abandonPendingPeer.call(this, aliceKey);
+      };
+
+      var responseCraigs1 = null;
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000100', function (craigs) {
+        responseCraigs1 = craigs;
+      });
+
+      kademlia.mockTime.advance(5500);
+
+      assert.deepEqual(peerAbandoned, [aliceKey]);
+
+      kademlia.mockTime.advance(20000);
+
+      // _recvFoundNode will never complete, so it won't return the empty response.
+      assert.deepEqual(responseCraigs1, null);
+
+      assert(0);
     });
   });
 });

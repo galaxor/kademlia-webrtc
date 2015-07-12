@@ -483,8 +483,8 @@ KademliaRemoteNodeAlice = function (node) {
 
   // Keep track of the FIND_NODE searches that we've initiated, so that when we
   // get ICE candidates and answers, we'll know what search they come from.
-  this.findNodeSearchSerial = 0;
-  this.findNodeSearches = {};
+  this.findNodeSearchesInitiatedSerial = 0;
+  this.findNodeSearchesInitiated = {};
 };
 KademliaRemoteNodeBob = function (node) { this.node = node; };
 KademliaRemoteNodeCraig = function (node) {
@@ -633,7 +633,8 @@ KademliaRemoteNodeAlice.prototype.addIceListener = function (searchSerial, fromI
   if (typeof this.node.iceTimeouts[this.node.dht.id][searchSerial] == "undefined") {
     this.node.iceTimeouts[this.node.dht.id][searchSerial] = {};
   }
-  this.node.iceTimeouts[this.node.dht.id][searchSerial][fromIdx] = setTimeout(this._cancelIceListener.bind(this, searchSerial, fromIdx), this.node.iceTimeout);
+  var cancelThisIce = this._cancelIceListener.bind(this, searchSerial, fromIdx);
+  this.node.iceTimeouts[this.node.dht.id][searchSerial][fromIdx] = setTimeout(cancelThisIce, this.node.iceTimeout);
 };
 
 /**
@@ -645,18 +646,18 @@ KademliaRemoteNodeAlice.prototype.recvIceCandidate = function (searchSerial, idx
   // Refresh the timeout.  We've heard from them now, so don't give up on them
   // until they've gone silent for the full iceTimeout ms from now.
   clearTimeout(this.node.iceTimeouts[this.node.dht.id][searchSerial][idx]);
-  this.node.iceTimeouts[this.node.dht.id][searchSerial][idx] = setTimeout(this._cancelIceListener.bind(this, searchSerial, idx), this.node.iceTimeout);
+  var cancelThisIce = this._cancelIceListener.bind(this, searchSerial, idx);
+  this.node.iceTimeouts[this.node.dht.id][searchSerial][idx] = setTimeout(cancelThisIce, this.node.iceTimeout);
 };
 
 /**
  * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
  */
 KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, idx) {
-  clearTimeout(this.iceTimeouts[searchSerial][idx]);
-  delete this.node.iceTimeouts[searchSerial][idx];
+  delete this.node.iceTimeouts[this.node.dht.id][searchSerial][idx];
   delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][idx];
-  if (Object.keys(this.iceTimeouts[searchSerial]).length == 0) {
-    delete this.node.iceTimeouts[searchSerial];
+  if (Object.keys(this.node.iceTimeouts[this.node.dht.id][searchSerial]).length == 0) {
+    delete this.node.iceTimeouts[this.node.dht.id][searchSerial];
     delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial];
     if (Object.keys(this.node.listeners['ICECandidate'][this.node.dht.id]).length == 0) {
       delete this.node.listeners['ICECandidate'][this.node.dht.id];
@@ -687,9 +688,9 @@ KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, callbac
   // We could use the search key as the identifier for the search, but if we
   // use a search serial, we don't need to tell people what we're searching for
   // until we've decided to communicate with them directly.
-  var searchSerial = this.findNodeSearchSerial;
-  this.findNodeSearches[this.findNodeSearchSerial] = key;
-  this.findNodeSearchSerial++;
+  var searchSerial = this.findNodeSearchesInitiatedSerial;
+  this.findNodeSearchesInitiated[this.findNodeSearchesInitiatedSerial] = key;
+  this.findNodeSearchesInitiatedSerial++;
 
   node.asAlice._makeOffers(function (offers, peers) {
     node.listeners['FOUND_NODE'][searchSerial] = node.asAlice._recvFoundNode.bind(node.asAlice, key, searchSerial, peers, callback);
@@ -1138,7 +1139,6 @@ KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, s
  * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
  */
 KademliaRemoteNodeBob.prototype._cancelIceListener = function (fromKey, toKey) {
-  clearTimeout(this.node.iceTimeouts[fromKey][toKey]);
   delete this.node.iceTimeouts[fromKey][toKey];
   delete this.node.listeners['ICECandidate'][fromKey][toKey];
   if (Object.keys(this.node.iceTimeouts[fromKey]).length == 0) {
@@ -1280,7 +1280,6 @@ KademliaRemoteNodeCraig.prototype.recvIceCandidate = function (aliceKey, alicePe
  * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
  */
 KademliaRemoteNodeCraig.prototype._cancelIceListener = function (aliceKey) {
-  clearTimeout(this.node.iceTimeouts[aliceKey][this.node.dht.id]);
   delete this.node.iceTimeouts[aliceKey][this.node.dht.id];
   delete this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id];
   if (Object.keys(this.node.iceTimeouts[aliceKey]).length == 0) {
