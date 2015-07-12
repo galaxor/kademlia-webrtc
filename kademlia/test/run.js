@@ -1895,9 +1895,9 @@ describe("KademliaRemoteNodeAlice", function () {
       kademlia.KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, idx) {
         orig_cancelIceListener.call(this, searchSerial, idx);
         
-        if (typeof this.node.iceTimeouts[this.node.dht.id][searchSerial] == "undefined") {
+        if (typeof this.node.iceTimeouts[this.node.dht.id] == "undefined") {
           // We're in this situation after we've deleted the last callback.
-          assert.equal(typeof this.node.iceTimeouts[this.node.dht.id][searchSerial], "undefined");
+          assert.equal(typeof this.node.iceTimeouts[this.node.dht.id], "undefined");
           assert.equal(typeof this.node.listeners['ICECandidate'][this.node.dht.id], "undefined");
         } else {
           assert.equal(typeof this.node.iceTimeouts[this.node.dht.id][searchSerial][idx], "undefined");
@@ -1920,10 +1920,10 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.deepEqual(responseCraigs1, null);
 
       debugger;
-      assert.deepEqual(participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], {});
+      assert.equal(typeof participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], "undefined");
       assert.equal(typeof participantsAB.bobAccordingToAlice.listeners['ICECandidate'][participantsAB.bobAccordingToAlice.dht.id], "undefined");
 
-      assert.deepEqual(participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], {});
+      assert.equal(typeof participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], "undefined");
     });
   });
   // XXX make sure the lists of listeners for FOUND_NODE, ICECandidate, and answer are empty after a successful FIND_NODE.

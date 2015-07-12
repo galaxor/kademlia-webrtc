@@ -660,6 +660,7 @@ KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, i
     delete this.node.iceTimeouts[this.node.dht.id][searchSerial];
     delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial];
     if (Object.keys(this.node.listeners['ICECandidate'][this.node.dht.id]).length == 0) {
+      delete this.node.iceTimeouts[this.node.dht.id];
       delete this.node.listeners['ICECandidate'][this.node.dht.id];
     }
   }
