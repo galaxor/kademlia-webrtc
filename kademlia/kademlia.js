@@ -346,10 +346,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
   // answer to the return value of the search.
   var bitFindKey = bitOps.hex2BitStream(findKey);
 
-  // If we're not full after the target bucket, loop to more-specific buckets
-  // and then start over from the top.
   var nodesTouched=0;
-  var first = true;
   var bucketIndex = this._findBucketIndex(bitFindKey);
 
   // If they've requested the key of this node, don't return self, just return
@@ -358,7 +355,12 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
     bucketIndex = this.buckets.length - 1;
   }
   var targetBucket = bucketIndex;
+
+  // Move from the target bucket to the most-specific bucket.  If we're still
+  // not full, start from the target bucket -1 and move toward the
+  // least-specific bucket.
   do {
+    console.log("Trying bucket ", bucketIndex);
     var bucket = this.buckets[bucketIndex];
     var bucketKeys = Object.keys(bucket);
     for (var i=0; nodesTouched<this.k && i < bucketKeys.length && this.findNodeSearches[searchId].offers.length > 0; i++) {
@@ -376,8 +378,19 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
         remoteNode.asBob.sendOffer(findKey, offer, requestorKey, searchSerial, idx, this._recvAnswer.bind(this, searchId, returnCallback));
       }
     }
-    bucketIndex = (bucketIndex + 1) % this.B;
-  } while (bucketIndex != targetBucket);
+
+    // Move from the target bucket to the most-specific bucket.  If we're still
+    // not full, start from the target bucket -1 and move toward the
+    // least-specific bucket.
+    if (bucketIndex >= targetBucket) {
+      bucketIndex = bucketIndex + 1;
+      if (bucketIndex == this.B) {
+        bucketIndex = targetBucket - 1;
+      }
+    } else {
+      bucketIndex = bucketIndex - 1;
+    }
+  } while (bucketIndex >= 0);
 
   // If we did not actually send any offers, we can return immediately.
   // This would happen if we know of no peers.

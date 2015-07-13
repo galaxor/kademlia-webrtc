@@ -651,12 +651,12 @@ describe("KademliaDHT", function () {
     });
 
     it("after checking the most-specific bucket, it should move from the target bucket to less-specific buckets.", function () {
-      assert(0);
       var kademlia = mockTimedKademlia();
 
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
 
       var keys = [
+        '04000001',
         '08000001',
         '10000001',
         '20000001',
@@ -702,6 +702,57 @@ describe("KademliaDHT", function () {
         '10000001',
         '20000001',
         '20000002',
+      ];
+      assert.deepEqual(retVal.sort(), retKeys);
+    });
+
+    it("checks the buckets at the extreme edges.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+
+      var keys = [
+        '00000001',
+        'ffffffff',
+      ];
+      for (var i=0; i<keys.length; i++) {
+        var key1 = keys[i];
+        var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: {}});
+        willRespondNode.peer.node = willRespondNode;
+        willRespondNode.peer.send = function (chan, msg) {
+          var node = this.node;
+          var myId = this.node.id;
+          kademlia.mockTime.setTimeout(function () {
+            // This is what we would have sent.
+            // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+            if (chan == 'dht' && msg.op == 'offer') {
+              // Instead of sending to anybody, just call your own onMessage.
+              // This is what we will receive.
+              // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+              node.onMessage(myId, {op: 'answer', to: msg.from, from: myId, answer:myId, serial:msg.serial, idx:msg.idx});
+            }
+          }, 10);
+        };
+        dht._insertNode(willRespondNode);
+      }
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = [];
+        for (var i=0; i<answers.length; i++) {
+          retVal.push(answers[i].answer);
+        }
+      };
+
+      var reqKeys = [1,2,3,4];
+      dht.recvFindNodePrimitive('10000001', '00000000', 0, reqKeys, callbackFn);
+
+      kademlia.mockTime.advance(20);
+
+      var retKeys = [
+        '00000001',
+        'ffffffff',
       ];
       assert.deepEqual(retVal.sort(), retKeys);
     });
