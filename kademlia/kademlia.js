@@ -351,6 +351,12 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
   var nodesTouched=0;
   var first = true;
   var bucketIndex = this._findBucketIndex(bitFindKey);
+
+  // If they've requested the key of this node, don't return self, just return
+  // the most-specific bucket.
+  if (bucketIndex == null) {
+    bucketIndex = this.buckets.length - 1;
+  }
   var targetBucket = bucketIndex;
   do {
     var bucket = this.buckets[bucketIndex];

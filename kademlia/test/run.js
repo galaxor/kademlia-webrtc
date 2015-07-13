@@ -650,7 +650,8 @@ describe("KademliaDHT", function () {
       assert.deepEqual(retVal.sort(), retKeys);
     });
 
-    it("should try less-specific buckets second when looking in nearby buckets.", function () {
+    it("after checking the most-specific bucket, it should move from the target bucket to less-specific buckets.", function () {
+      assert(0);
       var kademlia = mockTimedKademlia();
 
       var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
@@ -765,7 +766,40 @@ describe("KademliaDHT", function () {
     });
 
     it("should return a sensible answer even if the searched key is its own", function () {
-      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+
+      var key1 = '80000001';
+      var willRespondNode = new kademlia.KademliaRemoteNode({id: key1, peer: {}});
+      willRespondNode.peer.send = function (chan, msg) {
+        kademlia.mockTime.setTimeout(function () {
+          // This is what we would have sent.
+          // {op: 'offer', from: aliceKey, offer: offer, idx: idx, }
+          if (chan == 'dht' && msg.op == 'offer') {
+            // Instead of sending to anybody, just call your own onMessage.
+            // This is what we will receive.
+            // {"op":"answer", "to":<hex rep of Alice's key>, "from":<hex representation of Craig's key>, "answer":<answer>, "idx":<idx>}
+            willRespondNode.onMessage(key1, {op: 'answer', to: msg.from, from: key1, answer:'good call', serial:msg.serial, idx:msg.idx});
+          }
+        }, 10);
+      };
+      dht._insertNode(willRespondNode);
+
+      var retVal = null;
+
+      var callbackFn = function (answers) {
+        retVal = [];
+        for (var i=0; i<answers.length; i++) {
+          retVal.push(answers[i].answer);
+        }
+      };
+
+      dht.recvFindNodePrimitive('00000000', '00000001', 0, ['fake offer', 'flake offer'], callbackFn);
+
+      kademlia.mockTime.advance(20);
+
+      assert.deepEqual(retVal, ['good call']);
     });
   });
 });
