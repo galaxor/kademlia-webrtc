@@ -360,7 +360,6 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
   // not full, start from the target bucket -1 and move toward the
   // least-specific bucket.
   do {
-    console.log("Trying bucket ", bucketIndex);
     var bucket = this.buckets[bucketIndex];
     var bucketKeys = Object.keys(bucket);
     for (var i=0; nodesTouched<this.k && i < bucketKeys.length && this.findNodeSearches[searchId].offers.length > 0; i++) {
