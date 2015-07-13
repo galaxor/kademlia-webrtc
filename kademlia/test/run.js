@@ -2001,11 +2001,11 @@ describe("KademliaRemoteNodeCraig", function () {
 
       var peerAbandoned = [];
 
-      orig_recvFoundNode = participantsAB.aliceAccordingToBob._recvFoundNode;
+      var orig_recvFoundNode = participantsAB.aliceAccordingToBob.asAlice._recvFoundNode;
 
       kademlia.KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, searchSerial, peers, callback, answers) {
         var orig = this;
-        setTimeout(function () {
+        kademlia.mockTime.setTimeout(function () {
           orig_recvFoundNode.call(orig, searchedKey, searchSerial, peers, callback, answers);
         }, 20000);
       };
@@ -2025,12 +2025,10 @@ describe("KademliaRemoteNodeCraig", function () {
 
       assert.deepEqual(peerAbandoned, [aliceKey]);
 
-      kademlia.mockTime.advance(20000);
+      assert.throws(function () { kademlia.mockTime.advance(30000); }, kademlia.UnexpectedError);
 
       // _recvFoundNode will never complete, so it won't return the empty response.
       assert.deepEqual(responseCraigs1, null);
-
-      assert(0);
     });
   });
 });
