@@ -2038,6 +2038,14 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.equal(dataChannelOpenCalled, 1);
       assert.equal(Object.keys(responseCraigs1).length, 1);
     });
+
+    it("make sure the lists of listeners for FOUND_NODE, ICECandidate, and answer are empty after a successful FIND_NODE.", function () {
+      assert(0);
+    });
+
+    it("make sure the lists of listeners for FOUND_NODE, ICECandidate, and answer are empty after a successful FIND_NODE in which we knew all the Craigs already.", function () {
+      assert(0);
+    });
   });
 
   describe("#_cancelIceListener", function () {
@@ -2113,7 +2121,6 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.equal(typeof participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], "undefined");
     });
   });
-  // XXX make sure the lists of listeners for FOUND_NODE, ICECandidate, and answer are empty after a successful FIND_NODE.
 });
 
 describe("KademliaRemoteNodeCraig", function () {
