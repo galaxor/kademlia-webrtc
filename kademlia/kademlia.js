@@ -777,7 +777,7 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
           // This search is now complete.
           delete node.dht.searchResolution[searchSerial];
         };
-      })(callback), this.node.dht.findNodeTimeout, this.node),
+      })(callback, this.node), this.node.dht.findNodeTimeout, this.node),
     callback: callback,
   };
 

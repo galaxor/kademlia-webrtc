@@ -1933,7 +1933,54 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.equal(dataChannelOpenCalled, 7);
     });
 
-    it("behaves correctly when each of the timeouts times out", function () {
+    it("should return an empty bucket if we fail to open a channel to anyone in time.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '10000000';
+      var bobKey   = '00000000';
+      var craigKeys = ['00010000', '00010001', '00010002', '00001000'];
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+
+      var craigs = [];
+      var participantsBC = [];
+      for (var i=0; i<craigKeys.length; i++) {
+        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4}));
+        participantsBC.push(matchMake(bob, craigs[craigs.length-1], kademlia));
+      }
+
+      var participantsAB = matchMake(alice, bob, kademlia);
+      
+      var responseCraigs1 = null;
+
+      var iceCandidatesPrevented = [];
+
+      // Make sure that none of the channels can open.
+      kademlia.KademliaRemoteNodeAlice.prototype.recvIceCandidate = function (searchSerial, idx, peer, candidate) {
+        iceCandidatesPrevented.push(candidate);
+      };
+
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000100', function (craigs) {
+        responseCraigs1 = craigs;
+      });
+
+      var dataChannelOpenCalled = 0;
+
+      var origDataChannelOpen = kademlia.WebRTCPeer.prototype._dataChannelOpen;
+
+      kademlia.WebRTCPeer.prototype._dataChannelOpen = function (channel) {
+        dataChannelOpenCalled++;
+        origDataChannelOpen.call(this, channel);
+      };
+
+      kademlia.mockTime.advance(1000);
+
+      assert.equal(dataChannelOpenCalled, 0);
+      assert.deepEqual(responseCraigs1, []);
+    });
+
+    it("should return a partially-full bucket if we open a channel to some of them in time.", function () {
       assert(0);
     });
   });
