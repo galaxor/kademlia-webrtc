@@ -810,7 +810,7 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       if (typeof this.node.dht.pendingResponsePeers[craigKey] == "undefined") {
         this.node.dht.pendingResponsePeers[craigKey] = {};
       }
-      this.node.dht.pendingResponsePeers[craigKey][searchSerial] = true;
+      this.node.dht.pendingResponsePeers[craigKey][searchSerial] = idx;
       this.node.dht.searchResolution[searchSerial].awaitingReply++;
 
       var sendLocalIce = (function (coolKey) {
@@ -851,10 +851,9 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
           // Check all the searches that are waiting for this peer.  Add this
           // peer to the list of peers who have replied.  If this completes the set
           // of peers that search was waiting for, return the set.
-          var waitingSearches = Object.keys(node.dht.pendingResponsePeers[craigKey]);
-          delete node.dht.pendingResponsePeers[craigKey];
-          for (var i=0; i<waitingSearches.length; i++) {
-            var serial = waitingSearches[i];
+          // var waitingSearches = Object.keys(node.dht.pendingResponsePeers[craigKey]);
+          for (var serial in node.dht.pendingResponsePeers[craigKey]) {
+            var idx = node.dht.pendingResponsePeers[craigKey][serial];
             node.dht.searchResolution[serial].repliedPeers[craigKey] = remoteNode;
 
             node.dht.searchResolution[serial].awaitingReply--;
@@ -864,6 +863,10 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
               // Also, get rid of the timeout.
               clearTimeout(node.dht.searchResolution[serial].timeout);
               delete node.listeners['FOUND_NODE'][searchSerial];
+              delete node.listeners['ICECandidate'][node.dht.id][serial];
+              if (Object.keys(node.listeners['ICECandidate'][node.dht.id]).length == 0) {
+                delete node.listeners['ICECandidate'][node.dht.id];
+              }
 
               node.dht.searchResolution[serial].callback(node.dht.searchResolution[serial].repliedPeers);
 
@@ -871,6 +874,7 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
               delete node.dht.searchResolution[serial];
             }
           }
+          delete node.dht.pendingResponsePeers[craigKey];
         };
       })(craigKey, this.node);
 

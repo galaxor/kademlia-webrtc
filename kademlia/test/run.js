@@ -144,6 +144,11 @@ describe("mock-wrtc", function () {
 
 describe("KademliaDHT", function () {
   // XXX test the different forms of the constructor.
+  describe("#constructor", function () {
+    it("things should work when B > 32", function () {
+      assert(0);
+    });
+  });
 
   // XXX test _insertNode.
 
@@ -2039,11 +2044,162 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.equal(Object.keys(responseCraigs1).length, 1);
     });
 
-    it("make sure the lists of listeners for FOUND_NODE, ICECandidate, and answer are empty after a successful FIND_NODE.", function () {
-      assert(0);
+    it("should clear the lists of listeners for FOUND_NODE and ICECandidate after a successful FIND_NODE.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
     });
 
-    it("make sure the lists of listeners for FOUND_NODE, ICECandidate, and answer are empty after a successful FIND_NODE in which we knew all the Craigs already.", function () {
+    it("should clear the lists of listeners for FOUND_NODE and ICECandidate after a successful FIND_NODE where we knew all the peers.", function () {
+      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+    });
+
+    it("should clear the lists of listeners for FOUND_NODE and ICECandidate after a successful FIND_NODE where only some peers responded.", function () {
+      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+    });
+
+    it("should clear the lists of listeners for FOUND_NODE and ICECandidate after timeout when waiting for FOUND_NODE.", function () {
+      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+    });
+
+    it("make sure the lists of listeners for FOUND_NODE and ICECandidate are empty after a successful FIND_NODE in which we knew all the Craigs already.", function () {
       assert(0);
     });
   });
@@ -2120,6 +2276,50 @@ describe("KademliaRemoteNodeAlice", function () {
 
       assert.equal(typeof participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], "undefined");
     });
+  });
+});
+
+describe("KademliaRemoteNodeBob", function () {
+  describe("#sendFoundNode", function () {
+    it("should clear the lists of listeners for ICECandidate and answer after a successful FIND_NODE.", function () {
+      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+    });
+    
   });
 });
 
@@ -2223,6 +2423,86 @@ describe("KademliaRemoteNodeCraig", function () {
 
       // _recvFoundNode will never complete, so it won't return the empty response.
       assert.deepEqual(responseCraigs1, null);
+    });
+  });
+
+  describe("#recvOffer", function () {
+    it("should clear the list of listeners for ICECandidate after the data channel opens.", function () {
+      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+    });
+
+    it("should clear the list of listeners for ICECandidate after timeout when waiting to open the data channel.", function () {
+      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
     });
   });
 });
