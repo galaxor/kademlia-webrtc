@@ -47,6 +47,7 @@ function KademliaDHT(options) {
     tReplicate: 3600,
     findNodeTimeout: 500,
     id: null,
+    unexpectedMsg: 'ignore',
   };
 
   // Set the defaults.
@@ -132,7 +133,36 @@ function KademliaDHT(options) {
   // searches that the peer will resolve.  If all the searches give up, that
   // peer is no longer pending.
   this.pendingResponsePeers = {};
+
+  // If we receive an unexpected message, the default behavior is to ignore it.
+  // If the KadmeliaDHT is initialized with unexpectedMsg: 'ignore', it will
+  // ignore these messages.  If it is set to 'log', then the message will be
+  // stored in this array.  If it is set to 'throw', then an exception will be
+  // thrown.
+  this.unexpectedMsgLog = [];
 }
+
+/**
+ * Handle an Unexpected message.
+ * The default behavior is to ignore it.
+ * The debugging behavior is to log it to an array or throw an exception.
+ */
+KademliaDHT.prototype.handleUnexpected = function (msg, data) {
+  switch (this.unexpectedMsg) {
+  case 'throw':
+    throw new UnexpectedError(msg);
+    break;
+
+  case 'log':
+    this.unexpectedMsgLog.push({msg: msg, data: data});
+    break;
+
+  case 'ignore':
+  default:
+    break;
+  }
+};
+
 
 /**
  * Add a listener for a particular message.
@@ -183,7 +213,7 @@ KademliaDHT.prototype.onMessage = function (from, msg) {
   }
 
   if (listeners == null) {
-    throw new UnexpectedError("Unexpected message.");
+    this.handleUnexpected("Unexpected message.");
   }
 
   var stop = false;
@@ -409,7 +439,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
  */
 KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, idx, craigId, answer) {
   if (typeof this.findNodeSearches[searchId] == "undefined") {
-    throw new UnexpectedError("Got an unexpected answer.");
+    this.handleUnexpected("Got an unexpected answer.", {searchId: searchId, idx: idx, craigId: craigId});
   }
 
   this.findNodeSearches[searchId].answers.push({
@@ -833,9 +863,6 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
       // of peers that search was waiting for, return the set.
       var onOpen = (function (craigKey, node) {
         return function (peer, channel) {
-          // We can stop listening for ICE Candidates from this peer.
-          // XXX
-
           var remoteNode = new KademliaRemoteNode({
             id: craigKey,
             peer: peer,
@@ -884,6 +911,13 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
     } else {
       // We already knew about this peer.  Just put the existing KademliaRemoteNode in the list.
       this.node.dht.searchResolution[searchSerial].repliedPeers[key] = this.node.dht.knownPeers[key];
+      delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][idx];
+      if (Object.keys(this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial]).length == 0) {
+        delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial];
+        if (Object.keys(this.node.listeners['ICECandidate'][this.node.dht.id]).length == 0) {
+          delete this.node.listeners['ICECandidate'][this.node.dht.id];
+        }
+      }
     }
   }
 
@@ -902,6 +936,10 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
     this.node.dht.searchResolution[searchSerial].callback(this.node.dht.searchResolution[searchSerial].repliedPeers);
 
     delete this.node.listeners['FOUND_NODE'][searchSerial];
+    delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial];
+    if (Object.keys(this.node.listeners['ICECandidate'][this.node.dht.id]).length == 0) {
+      delete this.node.listeners['ICECandidate'][this.node.dht.id];
+    }
 
     // This search is now complete.
     delete this.node.dht.searchResolution[searchSerial];
@@ -960,7 +998,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       this.listeners['FOUND_NODE'][data.serial](data.answers);
     } else {
       // Unexpected.
-      throw new UnexpectedError("Received an unexpected FOUND_NODE");
+      this.dht.handleUnexpected("Received an unexpected FOUND_NODE", data);
     }
     break;
 
@@ -982,7 +1020,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
       this.listeners['answer'][data.to][data.serial](data.idx, data.from, data.answer);
     } else {
       // Unexpected.
-      throw new UnexpectedError("Unexpected");
+      this.dht.handleUnexpected("Unexpected", data);
     }
     break;
 
@@ -1003,28 +1041,20 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     break;
 
   case 'ICECandidate':
-    // Here, we are acting as Bob.  Someone (either Alice or Craig) has sent us
-    // an ICE Candidate and wants us to forward it to the other.
-    // Format (if Craig sent it):
-    // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "idx":<idx>}
-    // If Alice sent it, it won't have the 'idx'.
     if (typeof data.from != "string" || typeof data.to != "string" || typeof data.candidate != "object") {
       throw new MalformedError("Malformed");
     }
 
-    // Someone should establish listeners, and should establish timeouts to get
-    // rid of them when we give up, and legit get rid of them when they're not
-    // needed anymore (when the data channel opens!)
-    // Bob should establish listeners for Alice's ICE candidates when he
-    // sends a FOUND_NODE, because that means Alice will soon receive the
-    // answer, and Bob knows who Alice will be sending ICE Candidates to.  Bob
-    // should establish listeners for Craig's ICE candidates when he sends the
-    // offer to Craig.
-    // Alice should establish listeners for Craig's ICE candidates when she
-    // gets the answer from Craig, because that is when she will know Craig's
+    // Bob should have established listeners for Alice's ICE candidates when he
+    // sent a FOUND_NODE, because that means Alice will soon receive the
+    // answer, and Bob knows who Alice will be sending ICE Candidates to Craig.
+    // Bob should have established listeners for Craig's ICE candidates when he
+    // sent the offer to Craig.
+    // Alice should have established listeners for Craig's ICE candidates when she
+    // got the answer from Craig, because that is when she will know Craig's
     // kademlia ID.
-    // Craig should establish listeners for Alice's ICE candidates when he gets
-    // the offer.
+    // Craig should have established listeners for Alice's ICE candidates when
+    // he got the offer.
 
     // If I added listeners, whether as Alice, Bob, or Craig, they will all be
     // in the this.listeners['ICECandidate'] array.
@@ -1056,7 +1086,8 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
         if (typeof this.listeners['ICECandidate'][this.dht.id] == "undefined"
             || typeof this.listeners['ICECandidate'][this.dht.id][data.serial] == "undefined"
             || typeof this.listeners['ICECandidate'][this.dht.id][data.serial][data.idx] == "undefined") {
-          throw new UnexpectedError("Unexpected ICECandidate.");
+          this.dht.handleUnexpected("Unexpected ICECandidate.", data);
+          break;
         }
 
         this.listeners['ICECandidate'][this.dht.id][data.serial][data.idx](data.candidate);
@@ -1071,7 +1102,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
           // This is Craig format.  Act as Craig.
           this.listeners['ICECandidate'][data.from][this.dht.id](data.candidate);
         } else {
-          throw new UnexpectedError("Unexpected ICECandidate.");
+          this.dht.handleUnexpected("Unexpected ICECandidate.", data);
         }
       } else {
         // This is not Alice or Craig format.  It is malformed.
@@ -1099,7 +1130,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
           && typeof this.listeners['ICECandidate'][fromKey][data.to] != "undefined") {
         this.listeners['ICECandidate'][fromKey][data.to](data.candidate, data.serial, data.idx);
       } else {
-        throw new UnexpectedError("Unexpected ICECandidate");
+        this.dht.handleUnexpected("Unexpected ICECandidate", data);
       }
     }
     

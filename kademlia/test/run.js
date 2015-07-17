@@ -382,7 +382,7 @@ describe("KademliaDHT", function () {
     it("should return a full bucket if there are enough nodes to fill a bucket.", function () {
       var kademlia = mockTimedKademlia();
 
-      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4, unexpectedMsg: 'throw'});
 
       var keys = [
         '20000001',
@@ -435,7 +435,7 @@ describe("KademliaDHT", function () {
     it("should return a full bucket if there are more than enough nodes to fill a bucket.", function () {
       var kademlia = mockTimedKademlia();
 
-      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4, unexpectedMsg: 'throw'});
 
       var keys = [
         '20000001',
@@ -491,7 +491,7 @@ describe("KademliaDHT", function () {
     it("should return a full bucket if you ask for more than a full bucket.", function () {
       var kademlia = mockTimedKademlia();
 
-      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4, unexpectedMsg: 'throw'});
 
       var keys = [
         '20000001',
@@ -602,7 +602,7 @@ describe("KademliaDHT", function () {
     it("should try more-specific buckets first when looking in nearby buckets.", function () {
       var kademlia = mockTimedKademlia();
 
-      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4, unexpectedMsg: 'throw'});
 
       var keys = [
         '08000001',
@@ -658,7 +658,7 @@ describe("KademliaDHT", function () {
     it("after checking the most-specific bucket, it should move from the target bucket to less-specific buckets.", function () {
       var kademlia = mockTimedKademlia();
 
-      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4, unexpectedMsg: 'throw'});
 
       var keys = [
         '04000001',
@@ -714,7 +714,7 @@ describe("KademliaDHT", function () {
     it("checks the buckets at the extreme edges.", function () {
       var kademlia = mockTimedKademlia();
 
-      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4});
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000', k: 4, unexpectedMsg: 'throw'});
 
       var keys = [
         '00000001',
@@ -868,8 +868,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -917,8 +917,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -990,9 +990,9 @@ describe("KademliaRemoteNode", function () {
       var bobKey   = '10000000';
       var craigKey = '40000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
       var participants2 = matchMake(bob, craig, kademlia);
@@ -1027,10 +1027,10 @@ describe("KademliaRemoteNode", function () {
       var craigKey = '80000008';
       var deniseKey = '80000007';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
-      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4, unexpectedMsg: 'throw'});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsBC = matchMake(bob, craig, kademlia);
@@ -1068,10 +1068,10 @@ describe("KademliaRemoteNode", function () {
       var craigKey = '80000008';
       var deniseKey = '80000007';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
-      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'log'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'log'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'log'});
+      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4, unexpectedMsg: 'log'});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsBC = matchMake(bob, craig, kademlia);
@@ -1112,8 +1112,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -1154,8 +1154,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -1265,8 +1265,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -1303,8 +1303,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -1341,8 +1341,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -1481,8 +1481,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -1565,8 +1565,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -1699,19 +1699,18 @@ describe("KademliaRemoteNode", function () {
       assert(gotMalformed);
     });
 
-    it("should throw MalformedError if we get a completely unexpected message.", function () {
+    it("should throw UnexpectedError if we get a completely unexpected message.", function () {
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
-      // Send a malformed ICE candidate from Bob to Alice.
-      // {"op":"ICECandidate", "from":<hex rep of Craig's key>, "to":<hex rep of Alice's key>, "candidate":<whatever the ICE candidate thing is>, "serial":<the serial number Alice sent>, "idx":<idx>}
+      // Send a msg with a bad "op" from Bob to Alice.
 
       var gotUnexpected = false;
 
@@ -1741,8 +1740,8 @@ describe("KademliaRemoteNode", function () {
       var aliceKey = '00000000';
       var bobKey   = '10000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
 
@@ -1799,9 +1798,9 @@ describe("KademliaRemoteNodeAlice", function () {
       var bobKey   = '10000000';
       var craigKey = '80000008';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsAC = matchMake(alice, craig, kademlia);
@@ -1820,7 +1819,11 @@ describe("KademliaRemoteNodeAlice", function () {
         dataChannelOpenCalled = true;
       };
 
-      kademlia.mockTime.advance(100);
+      // We will get an UnexpectedError.  That is because the Craig we already
+      // know will send us ICE Candidates because it doesn't know who it's
+      // talking to, but Alice knows that the Craig is someone it knows, so
+      // does not set out any listeners for that ICE Candidate.
+      assert.throws(function () { kademlia.mockTime.advance(100); }, kademlia.UnexpectedError);
 
       assert.deepEqual(Object.keys(responseCraigs), [craigKey]);
       assert.equal(responseCraigs[craigKey], participantsAC.bobAccordingToAlice);
@@ -1840,10 +1843,10 @@ describe("KademliaRemoteNodeAlice", function () {
       var craigKey = '80000008';
       var deniseKey = '80000007';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
-      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'log'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'log'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'log'});
+      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4, unexpectedMsg: 'log'});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsAC = matchMake(alice, craig, kademlia);
@@ -1865,7 +1868,31 @@ describe("KademliaRemoteNodeAlice", function () {
         dataChannelOpenCalled++;
         origDataChannelOpen.call(this, channel);
       };
+
       kademlia.mockTime.advance(100);
+
+      // Alice will get an unexpected ICE candidate.  That is because the Craig we already
+      // know will send us ICE Candidates because it doesn't know who it's
+      // talking to, but Alice knows that the Craig is someone it knows, so
+      // does not set out any listeners for that ICE Candidate.
+      assert.deepEqual(alice.unexpectedMsgLog, 
+        [{
+          msg: "Unexpected ICECandidate.",
+          data: {
+            op: 'ICECandidate',
+            from: '80000008',
+            to: '00000000',
+            candidate: 
+             { type: 'ice',
+               sdp: 
+                { candidate: undefined,
+                  sdpMid: undefined,
+                  sdpMLineIndex: undefined } },
+            serial: 0,
+            idx: 2 
+          },
+        }]);
+        
 
       assert.deepEqual(Object.keys(responseCraigs).sort(), [craigKey, deniseKey].sort());
       assert(responseCraigs[craigKey].peer == participantsAC.bobAccordingToAlice.peer);
@@ -1896,12 +1923,12 @@ describe("KademliaRemoteNodeAlice", function () {
         '00000100', '00000101', '00000102'
       ];
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var craigs = [];
       for (var i=0; i<craigKeys.length; i++) {
-        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4}));
+        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4, unexpectedMsg: 'throw'}));
         matchMake(bob, craigs[craigs.length-1], kademlia);
       }
 
@@ -1945,13 +1972,13 @@ describe("KademliaRemoteNodeAlice", function () {
       var bobKey   = '00000000';
       var craigKeys = ['00010000', '00010001', '00010002', '00001000'];
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var craigs = [];
       var participantsBC = [];
       for (var i=0; i<craigKeys.length; i++) {
-        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4}));
+        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4, unexpectedMsg: 'throw'}));
         participantsBC.push(matchMake(bob, craigs[craigs.length-1], kademlia));
       }
 
@@ -1993,13 +2020,13 @@ describe("KademliaRemoteNodeAlice", function () {
       var bobKey   = '00000000';
       var craigKeys = ['00010000', '00010001', '00010002', '00001000'];
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
 
       var craigs = [];
       var participantsBC = [];
       for (var i=0; i<craigKeys.length; i++) {
-        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4}));
+        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4, unexpectedMsg: 'throw'}));
         participantsBC.push(matchMake(bob, craigs[craigs.length-1], kademlia));
       }
 
@@ -2051,9 +2078,9 @@ describe("KademliaRemoteNodeAlice", function () {
       var bobKey   = '10000000';
       var craigKey = '40000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
       var participants2 = matchMake(bob, craig, kademlia);
@@ -2083,30 +2110,34 @@ describe("KademliaRemoteNodeAlice", function () {
     });
 
     it("should clear the lists of listeners for FOUND_NODE and ICECandidate after a successful FIND_NODE where we knew all the peers.", function () {
-      assert(0);
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
       var bobKey   = '10000000';
       var craigKey = '40000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
-      var participants = matchMake(alice, bob, kademlia);
-      var participants2 = matchMake(bob, craig, kademlia);
+      var participantsAB = matchMake(alice, bob, kademlia);
+      var participantsBC = matchMake(bob, craig, kademlia);
+      var participantsAC = matchMake(alice, craig, kademlia);
 
-      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Now we have an Alice who knows about Bob and Craig, and a Bob, who knows about
       // Alice and Craig.  Let's see what happens when Alice asks for some
       // friends.
       var responseCraigs = null;
 
-      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
         responseCraigs = craigs;
       });
 
-      kademlia.mockTime.advance(1000);
+      // We will get an UnexpectedError.  That is because the Craig we already
+      // know will send us ICE Candidates because it doesn't know who it's
+      // talking to, but Alice knows that the Craig is someone it knows, so
+      // does not set out any listeners for that ICE Candidate.
+      assert.throws(function () { kademlia.mockTime.advance(1000); }, kademlia.UnexpectedError);
 
       assert.notEqual(responseCraigs, null);
 
@@ -2117,8 +2148,8 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
 
       // Make sure the listeners are empty.
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+      assert.deepEqual(participantsAB.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participantsAB.bobAccordingToAlice.listeners['ICECandidate'], {});
     });
 
     it("should clear the lists of listeners for FOUND_NODE and ICECandidate after a successful FIND_NODE where only some peers responded.", function () {
@@ -2129,9 +2160,9 @@ describe("KademliaRemoteNodeAlice", function () {
       var bobKey   = '10000000';
       var craigKey = '40000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
       var participants2 = matchMake(bob, craig, kademlia);
@@ -2168,9 +2199,9 @@ describe("KademliaRemoteNodeAlice", function () {
       var bobKey   = '10000000';
       var craigKey = '40000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
       var participants2 = matchMake(bob, craig, kademlia);
@@ -2217,9 +2248,9 @@ describe("KademliaRemoteNodeAlice", function () {
       var bobKey   = '10000000';
       var craigKey = '80000008';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsBC = matchMake(bob, craig, kademlia);
@@ -2270,7 +2301,6 @@ describe("KademliaRemoteNodeAlice", function () {
       // _recvFoundNode will never complete, so it won't return the empty response.
       assert.deepEqual(responseCraigs1, null);
 
-      debugger;
       assert.equal(typeof participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], "undefined");
       assert.equal(typeof participantsAB.bobAccordingToAlice.listeners['ICECandidate'][participantsAB.bobAccordingToAlice.dht.id], "undefined");
 
@@ -2289,9 +2319,9 @@ describe("KademliaRemoteNodeBob", function () {
       var bobKey   = '10000000';
       var craigKey = '40000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
       var participants2 = matchMake(bob, craig, kademlia);
@@ -2337,9 +2367,9 @@ describe("KademliaRemoteNodeCraig", function () {
       var bobKey   = '10000000';
       var craigKey = '80000008';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsBC = matchMake(bob, craig, kademlia);
@@ -2386,9 +2416,9 @@ describe("KademliaRemoteNodeCraig", function () {
       var bobKey   = '10000000';
       var craigKey = '80000008';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsBC = matchMake(bob, craig, kademlia);
@@ -2435,9 +2465,9 @@ describe("KademliaRemoteNodeCraig", function () {
       var bobKey   = '10000000';
       var craigKey = '40000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
       var participants2 = matchMake(bob, craig, kademlia);
@@ -2474,9 +2504,9 @@ describe("KademliaRemoteNodeCraig", function () {
       var bobKey   = '10000000';
       var craigKey = '40000000';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
       var participants2 = matchMake(bob, craig, kademlia);
