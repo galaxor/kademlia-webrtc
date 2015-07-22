@@ -763,7 +763,7 @@ KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, callbac
           alice._cancelIceListener(serial, idxes[i], true);
         }
         
-        delete alice.findNodeSearchesInitiatedSerial;
+        delete alice.findNodeSearchesInitiated[serial];
 
         // Call the callback with an empty return set.
         callback({});

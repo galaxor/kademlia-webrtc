@@ -1172,8 +1172,39 @@ describe("KademliaRemoteNode", function () {
       assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
     });
 
-    it("should clear the timeout and findNodeSearchesInitiated after we gave up on hearing a FOUND_NODE.", function () {
-      assert(0);
+    it("should clear findNodeSearchesInitiated after we gave up on hearing a FOUND_NODE.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, searchSerial, answers) {
+        // Don't actually do anything.  Let it time out.
+      };
+
+      kademlia.mockTime.advance(10000);
+
+      assert.deepEqual(responseCraigs, {});
+
+      // Make sure findNodeSearchesInitiated is empty.
+      assert.deepEqual(participants.bobAccordingToAlice.asAlice.findNodeSearchesInitiated, {});
     });
   });
 
