@@ -2357,7 +2357,66 @@ describe("KademliaRemoteNodeAlice", function () {
     });
 
     it("make sure the lists of listeners for FOUND_NODE and ICECandidate are empty after a successful FIND_NODE in which we knew all the Craigs already.", function () {
-      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+      var deniseKey = '40000004';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participantsAB = matchMake(alice, bob, kademlia);
+      var participantsAC = matchMake(alice, craig, kademlia);
+      var participantsAD = matchMake(alice, denise, kademlia);
+      var participantsBC = matchMake(bob, craig, kademlia);
+      var participantsBD = matchMake(bob, denise, kademlia);
+
+      // Now we have an Alice who knows about Bob, Craig, and Denise, and a
+      // Bob, who knows about Craig, and Denise.  Let's see what happens when
+      // Alice asks for some friends.
+      var responseCraigs = null;
+
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      // Ignore ICE Candidates from Craig.
+      var iceCandidatesPrevented = [];
+      var allowedIceCandidates = [];
+      orig_recvIceCandidate = kademlia.KademliaRemoteNodeAlice.prototype.recvIceCandidate;
+
+      kademlia.KademliaRemoteNodeAlice.prototype.recvIceCandidate = function (searchSerial, idx, peer, candidate) {
+        if (idx == 3) {
+          iceCandidatesPrevented.push(candidate);
+        } else {
+          orig_recvIceCandidate.call(this, searchSerial, idx, peer, candidate);
+
+          allowedIceCandidates.push(candidate);
+        }
+      };
+
+      // We will get an UnexpectedError.  That is because the Craig we already
+      // know will send us ICE Candidates because it doesn't know who it's
+      // talking to, but Alice knows that the Craig is someone it knows, so
+      // does not set out any listeners for that ICE Candidate.
+      assert.throws(function () { kademlia.mockTime.advance(10000); }, kademlia.UnexpectedError);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 2);
+
+      assert.deepEqual(Object.keys(responseCraigs).sort(), [craigKey, deniseKey].sort());
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs).sort()[0]].id, craigKey);
+      assert.equal(responseCraigs[Object.keys(responseCraigs).sort()[1]].id, deniseKey);
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participantsAB.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participantsAB.bobAccordingToAlice.listeners['ICECandidate'], {});
     });
 
     it("should clear the timeout and findNodeSearchesInitiated a successful FOUND_NODE in which we did not know all the peers.", function () {
