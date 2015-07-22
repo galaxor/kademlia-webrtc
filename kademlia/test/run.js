@@ -1206,6 +1206,51 @@ describe("KademliaRemoteNode", function () {
       // Make sure findNodeSearchesInitiated is empty.
       assert.deepEqual(participants.bobAccordingToAlice.asAlice.findNodeSearchesInitiated, {});
     });
+
+    it("should clear findNodeSearchesInitiated after we gave up on hearing a FOUND_NODE, but leave searches we haven't given up on.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs1 = null;
+      var responseCraigs2 = null;
+
+      kademlia.KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, searchSerial, answers) {
+        // Don't actually do anything.  Let it time out.
+      };
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs1 = craigs;
+      });
+
+      // Give it not enough time to time out.
+      kademlia.mockTime.advance(100);
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000001', function (craigs) {
+        responseCraigs2 = craigs;
+      });
+
+      // Let the first search time out, but not the second.
+      kademlia.mockTime.advance(500);
+
+      assert.deepEqual(responseCraigs1, {});
+      assert.equal(responseCraigs2, null);
+
+      // Make sure findNodeSearchesInitiated is empty.
+      assert.equal(Object.keys(participants.bobAccordingToAlice.asAlice.findNodeSearchesInitiated).length, 1);
+    });
   });
 
   describe("#onMessage", function () {
