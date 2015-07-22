@@ -33,8 +33,14 @@ var now = timers.now;
  *    The parameters above are from the spec.  The ones below are
  *    implementation details not in the spec.
  *    findNodeTimeout - integer in msec (default: 500): After this amount of
- *                      time, give up on a FIND_NODE search primitive and
+ *                      time, Bob will give up on a FIND_NODE search primitive and
  *                      return whatever we've got so far.
+ *    foundNodeTimeout - integer in msec (default: 600): After this amount of
+ *                      time, Alice will give up on hearing a FOUND_NODE and return
+ *                      an empty set.
+ *    channelOpenTimeout - integer in msec (default: 500): After this amount of
+ *                      time, Alice will give up on the Craigs opening a
+ *                      channel, and return what we have managed to open so far.
  */
 function KademliaDHT(options) {
   var characteristics = {
@@ -46,6 +52,8 @@ function KademliaDHT(options) {
     tRefresh: 3600,
     tReplicate: 3600,
     findNodeTimeout: 500,
+    foundNodeTimeout: 600,
+    channelOpenTimeout: 500,
     id: null,
     unexpectedMsg: 'ignore',
   };
@@ -470,6 +478,9 @@ KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, idx, cra
  */
 KademliaDHT.prototype._returnFindNodeSearch = function (searchId, returnCallback) {
   var findNodeSearch = this.findNodeSearches[searchId];
+  // XXX Maybe not clear the timeout.  What if _returnFindNodeSearch was called
+  // *by* the timeout?  Clearing the timeout after the timeout has been called
+  // has been shown to cause problems with time-mock.
   clearTimeout(findNodeSearch.timeout);
   returnCallback(findNodeSearch.answers);
 
@@ -701,7 +712,10 @@ KademliaRemoteNodeAlice.prototype.recvIceCandidate = function (searchSerial, idx
 /**
  * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
  */
-KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, idx) {
+KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, idx, clearTimeouts) {
+  if (clearTimeouts) {
+    clearTimeout(this.node.iceTimeouts[this.node.dht.id][searchSerial][idx]);
+  }
   delete this.node.iceTimeouts[this.node.dht.id][searchSerial][idx];
   delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][idx];
   if (Object.keys(this.node.iceTimeouts[this.node.dht.id][searchSerial]).length == 0) {
@@ -738,7 +752,24 @@ KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, callbac
   // use a search serial, we don't need to tell people what we're searching for
   // until we've decided to communicate with them directly.
   var searchSerial = this.findNodeSearchesInitiatedSerial;
-  this.findNodeSearchesInitiated[this.findNodeSearchesInitiatedSerial] = key;
+  this.findNodeSearchesInitiated[this.findNodeSearchesInitiatedSerial] = {
+    key: key,
+    timeout: setTimeout((function (alice, serial, callback) {
+      return function () {
+        // Clear the info on this search.
+        delete alice.node.listeners['FOUND_NODE'][serial];
+        var idxes = Object.keys(alice.node.listeners['ICECandidate'][alice.node.dht.id][serial]);
+        for (var i=0; i<idxes.length; i++) {
+          alice._cancelIceListener(serial, idxes[i], true);
+        }
+        
+        delete alice.findNodeSearchesInitiatedSerial;
+
+        // Call the callback with an empty return set.
+        callback({});
+      };
+    })(this, this.findNodeSearchesInitiatedSerial, callback), this.node.dht.foundNodeTimeout),
+  };
   this.findNodeSearchesInitiatedSerial++;
 
   node.asAlice._makeOffers(function (offers, peers) {
@@ -802,12 +833,21 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
     timeout: setTimeout((function (callback, node) {
         return function () {
           delete node.listeners['FOUND_NODE'][searchSerial];
+
+          var idxes = Object.keys(node.listeners['ICECandidate'][node.dht.id][searchSerial]);
+          for (var i=0; i<idxes.length; i++) {
+            node.asAlice._cancelIceListener(searchSerial, idxes[i], true);
+          }
+
+          clearTimeout(node.asAlice.findNodeSearchesInitiated[searchSerial].timeout);
+          delete node.asAlice.findNodeSearchesInitiated[searchSerial];
+
           callback(node.dht.searchResolution[searchSerial].repliedPeers);
 
           // This search is now complete.
           delete node.dht.searchResolution[searchSerial];
         };
-      })(callback, this.node), this.node.dht.findNodeTimeout, this.node),
+      })(callback, this.node), this.node.dht.channelOpenTimeout, this.node),
     callback: callback,
   };
 
@@ -889,11 +929,13 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
               // All the peers have replied.  Return the full set.
               // Also, get rid of the timeout.
               clearTimeout(node.dht.searchResolution[serial].timeout);
-              delete node.listeners['FOUND_NODE'][searchSerial];
+              delete node.listeners['FOUND_NODE'][serial];
               delete node.listeners['ICECandidate'][node.dht.id][serial];
               if (Object.keys(node.listeners['ICECandidate'][node.dht.id]).length == 0) {
                 delete node.listeners['ICECandidate'][node.dht.id];
               }
+              clearTimeout(node.asAlice.findNodeSearchesInitiated[serial].timeout);
+              delete node.asAlice.findNodeSearchesInitiated[serial];
 
               node.dht.searchResolution[serial].callback(node.dht.searchResolution[serial].repliedPeers);
 
@@ -932,14 +974,16 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
     // All the peers have replied.  Return the full set.
     // Also, get rid of the timeout.
     clearTimeout(this.node.dht.searchResolution[searchSerial].timeout);
-
-    this.node.dht.searchResolution[searchSerial].callback(this.node.dht.searchResolution[searchSerial].repliedPeers);
+    clearTimeout(this.findNodeSearchesInitiated[searchSerial].timeout);
+    delete this.findNodeSearchesInitiated[searchSerial];
 
     delete this.node.listeners['FOUND_NODE'][searchSerial];
     delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial];
     if (Object.keys(this.node.listeners['ICECandidate'][this.node.dht.id]).length == 0) {
       delete this.node.listeners['ICECandidate'][this.node.dht.id];
     }
+
+    this.node.dht.searchResolution[searchSerial].callback(this.node.dht.searchResolution[searchSerial].repliedPeers);
 
     // This search is now complete.
     delete this.node.dht.searchResolution[searchSerial];

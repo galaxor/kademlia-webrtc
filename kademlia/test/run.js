@@ -1103,6 +1103,78 @@ describe("KademliaRemoteNode", function () {
       assert.deepEqual(Object.keys(responseCraigs2).sort(), [craigKey, deniseKey].sort());
       assert.equal(dataChannelOpenCalled, 2);
     });
+
+    it("should return an empty set if it never gets a FOUND_NODE.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, searchSerial, answers) {
+        // Don't actually do anything.  Let it time out.
+      };
+
+      kademlia.mockTime.advance(10000);
+
+      assert.deepEqual(responseCraigs, {});
+    });
+
+    it("should clear the lists of listeners for FOUND_NODE and ICECandidate after timeout when waiting for FOUND_NODE.", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, searchSerial, answers) {
+        // Don't actually do anything.  Let it time out.
+      };
+
+      kademlia.mockTime.advance(10000);
+
+      assert.deepEqual(responseCraigs, {});
+
+      // Make sure the listeners are empty.
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
+      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+    });
+
+    it("should clear the timeout and findNodeSearchesInitiated after we gave up on hearing a FOUND_NODE.", function () {
+      assert(0);
+    });
   });
 
   describe("#onMessage", function () {
@@ -2208,46 +2280,15 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.deepEqual(participantsAB.bobAccordingToAlice.listeners['ICECandidate'], {});
     });
 
-    it("should clear the lists of listeners for FOUND_NODE and ICECandidate after timeout when waiting for FOUND_NODE.", function () {
+    it("make sure the lists of listeners for FOUND_NODE and ICECandidate are empty after a successful FIND_NODE in which we knew all the Craigs already.", function () {
       assert(0);
-      var kademlia = mockTimedKademlia();
-
-      var aliceKey = '00000000';
-      var bobKey   = '10000000';
-      var craigKey = '40000000';
-
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
-
-      var participants = matchMake(alice, bob, kademlia);
-      var participants2 = matchMake(bob, craig, kademlia);
-
-      // Now we have an Alice who knows about Bob, and a Bob, who knows about
-      // Alice and Craig.  Let's see what happens when Alice asks for some
-      // friends.
-      var responseCraigs = null;
-
-      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
-        responseCraigs = craigs;
-      });
-
-      kademlia.mockTime.advance(1000);
-
-      assert.notEqual(responseCraigs, null);
-
-      assert.equal(Object.keys(responseCraigs).length, 1);
-
-      assert.equal(Object.keys(responseCraigs)[0], craigKey);
-
-      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
-
-      // Make sure the listeners are empty.
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
     });
 
-    it("make sure the lists of listeners for FOUND_NODE and ICECandidate are empty after a successful FIND_NODE in which we knew all the Craigs already.", function () {
+    it("should clear the timeout and findNodeSearchesInitiated a successful FOUND_NODE in which we did not know all the peers.", function () {
+      assert(0);
+    });
+
+    it("should clear the timeout and findNodeSearchesInitiated a successful FOUND_NODE in which we knew all the peers.", function () {
       assert(0);
     });
   });
@@ -2265,9 +2306,9 @@ describe("KademliaRemoteNodeAlice", function () {
       var bobKey   = '10000000';
       var craigKey = '80000008';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsBC = matchMake(bob, craig, kademlia);
@@ -2291,8 +2332,8 @@ describe("KademliaRemoteNodeAlice", function () {
 
       var orig_cancelIceListener = kademlia.KademliaRemoteNodeAlice.prototype._cancelIceListener;
 
-      kademlia.KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, idx) {
-        orig_cancelIceListener.call(this, searchSerial, idx);
+      kademlia.KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, idx, clearTimeouts) {
+        orig_cancelIceListener.call(this, searchSerial, idx, clearTimeouts);
         
         if (typeof this.node.iceTimeouts[this.node.dht.id] == "undefined") {
           // We're in this situation after we've deleted the last callback.
@@ -2315,7 +2356,9 @@ describe("KademliaRemoteNodeAlice", function () {
 
       kademlia.mockTime.advance(20000);
 
-      // _recvFoundNode will never complete, so it won't return the empty response.
+      // After foundNodeTimeout ms, alice would normally give up and return an
+      // empty craigs response, but we set it with foundNodeTimeout=99999 so we
+      // can see other things happen instead.
       assert.deepEqual(responseCraigs1, null);
 
       assert.equal(typeof participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], "undefined");
@@ -2384,9 +2427,9 @@ describe("KademliaRemoteNodeCraig", function () {
       var bobKey   = '10000000';
       var craigKey = '80000008';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsBC = matchMake(bob, craig, kademlia);
@@ -2417,7 +2460,9 @@ describe("KademliaRemoteNodeCraig", function () {
 
       assert.deepEqual(peerAbandoned, [aliceKey]);
 
-      // _recvFoundNode will never complete, so it won't return the empty response.
+      // After foundNodeTimeout ms, alice would normally give up and return an
+      // empty craigs response, but we set it with foundNodeTimeout=99999 so we
+      // can see other things happen instead.
       assert.deepEqual(responseCraigs1, null);
     });
 
@@ -2433,9 +2478,9 @@ describe("KademliaRemoteNodeCraig", function () {
       var bobKey   = '10000000';
       var craigKey = '80000008';
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw', foundNodeTimeout: 99999});
 
       var participantsAB = matchMake(alice, bob, kademlia);
       var participantsBC = matchMake(bob, craig, kademlia);
@@ -2468,7 +2513,9 @@ describe("KademliaRemoteNodeCraig", function () {
 
       assert.throws(function () { kademlia.mockTime.advance(30000); }, kademlia.UnexpectedError);
 
-      // _recvFoundNode will never complete, so it won't return the empty response.
+      // After foundNodeTimeout ms, alice would normally give up and return an
+      // empty craigs response, but we set it with foundNodeTimeout=99999 so we
+      // can see other things happen instead.
       assert.deepEqual(responseCraigs1, null);
     });
   });
