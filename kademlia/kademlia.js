@@ -375,7 +375,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
     requestorKey: requestorKey,
     serial: searchSerial,
     numOffers: offers.length,
-    timeout: setTimeout(KademliaDHT.prototype._returnFindNodeSearch.bind(this, searchId, returnCallback), this.findNodeTimeout),
+    timeout: setTimeout(KademliaDHT.prototype._returnFindNodeSearch.bind(this, searchId, returnCallback, false), this.findNodeTimeout),
     answers: [],
   };
 
@@ -432,7 +432,7 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
   // If we did not actually send any offers, we can return immediately.
   // This would happen if we know of no peers.
   if (this.findNodeSearches[searchId].offers.length == this.findNodeSearches[searchId].numOffers) {
-    this._returnFindNodeSearch(searchId, returnCallback);
+    this._returnFindNodeSearch(searchId, returnCallback, true);
   }
 };
 
@@ -464,7 +464,7 @@ KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, idx, cra
   var recvdAnswers = this.findNodeSearches[searchId].answers.length;
 
   if (recvdAnswers >= this.k || recvdAnswers >= sentOffers) {
-    this._returnFindNodeSearch(searchId, returnCallback);
+    this._returnFindNodeSearch(searchId, returnCallback, true);
   }
 };
 
@@ -476,12 +476,42 @@ KademliaDHT.prototype._recvAnswer = function (searchId, returnCallback, idx, cra
  * @param string searchId The hex representation of the key that was being searched for.
  * @param function returnCallback This is a call to a KademliaRemoteNode.asBob.sendFoundNode(fromKey, searchKey, searchSerial, answers).  But when it was passed to us, the first three args were curried, so all we still need to pass is answers.  In other words, this is what we will call once all the answers have come back and we've assembled them for the original requestor.
  */
-KademliaDHT.prototype._returnFindNodeSearch = function (searchId, returnCallback) {
+KademliaDHT.prototype._returnFindNodeSearch = function (searchId, returnCallback, cancelTimeout) {
   var findNodeSearch = this.findNodeSearches[searchId];
-  // XXX Maybe not clear the timeout.  What if _returnFindNodeSearch was called
+  var searchSerial = findNodeSearch.serial;
+
+  // Don't clear the timeout.  What if _returnFindNodeSearch was called
   // *by* the timeout?  Clearing the timeout after the timeout has been called
   // has been shown to cause problems with time-mock.
-  clearTimeout(findNodeSearch.timeout);
+  if (cancelTimeout) {
+    clearTimeout(findNodeSearch.timeout);
+  }
+
+  // Clear answer listeners.  (DON'T clear the ICECandidate listeners because
+  // Alice will not start sending ICECandidates until after receiving the
+  // FOUND_NODE message.  If we stop forwarding now, they will never communicate.
+  var aliceKey = findNodeSearch.requestorKey;
+  for (var i=0; i<findNodeSearch.answers.length; i++) {
+    var craigKey = findNodeSearch.answers[i].key;
+
+    delete this.knownPeers[craigKey].listeners['answer'][aliceKey][searchSerial];
+    if (Object.keys(this.knownPeers[craigKey].listeners['answer'][aliceKey]).length == 0) {
+      delete this.knownPeers[craigKey].listeners['answer'][aliceKey];
+    }
+
+    /*
+    delete this.knownPeers[craigKey].listeners['ICECandidate'][craigKey][aliceKey];
+    if (Object.keys(this.knownPeers[craigKey].listeners['ICECandidate'][craigKey]).length == 0) {
+      delete this.knownPeers[craigKey].listeners['ICECandidate'][craigKey];
+    }
+
+    delete this.knownPeers[aliceKey].listeners['ICECandidate'][aliceKey][craigKey];
+    if (Object.keys(this.knownPeers[aliceKey].listeners['ICECandidate'][aliceKey]).length == 0) {
+      delete this.knownPeers[aliceKey].listeners['ICECandidate'][aliceKey];
+    }
+    */
+  }
+
   returnCallback(findNodeSearch.answers);
 
   delete this.findNodeSearches[searchId];
@@ -1222,6 +1252,8 @@ KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, s
     serial: searchSerial,
     answers: answers,
   };
+
+  // We can stop listening for answers from these peers.
 
   // We know who Alice will be sending ICE Candidates to, so we can set up a listener for it.
   for (var i=0; i<answers.length; i++) {

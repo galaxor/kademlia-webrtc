@@ -2456,7 +2456,55 @@ describe("KademliaRemoteNodeAlice", function () {
     });
 
     it("should clear the timeout and findNodeSearchesInitiated a successful FOUND_NODE in which we knew all the peers.", function () {
-      assert(0);
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+      var deniseKey = '40000004';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+      var denise = new kademlia.KademliaDHT({B: 32, id: deniseKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participantsAB = matchMake(alice, bob, kademlia);
+      var participantsAC = matchMake(alice, craig, kademlia);
+      var participantsAD = matchMake(alice, denise, kademlia);
+      var participantsBC = matchMake(bob, craig, kademlia);
+      var participantsBD = matchMake(bob, denise, kademlia);
+
+      // Now we have an Alice who knows about Bob and Craig, and a Bob, who
+      // knows about Craig and Denise.  Let's see what happens when Alice asks
+      // for some friends.
+      var responseCraigs = null;
+
+      participantsAB.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      var dataChannelOpenCalled = 0;
+
+      var origDataChannelOpen = kademlia.WebRTCPeer.prototype._dataChannelOpen;
+
+      kademlia.WebRTCPeer.prototype._dataChannelOpen = function (channel) {
+        dataChannelOpenCalled++;
+        origDataChannelOpen.call(this, channel);
+      };
+
+      assert.throws(function () { kademlia.mockTime.advance(1000); }, kademlia.UnexpectedError);
+
+      assert.notEqual(responseCraigs, null);
+
+      // Make sure we only opened one channel.
+      assert.equal(dataChannelOpenCalled, 0);
+
+      assert.equal(Object.keys(responseCraigs).length, 2);
+
+      assert.deepEqual(Object.keys(responseCraigs).sort(), [craigKey, deniseKey].sort());
+
+      // Make sure findNodeSearchesInitiated is empty.
+      assert.equal(Object.keys(participantsAB.bobAccordingToAlice.asAlice.findNodeSearchesInitiated).length, 0);
     });
   });
 
@@ -2538,8 +2586,7 @@ describe("KademliaRemoteNodeAlice", function () {
 
 describe("KademliaRemoteNodeBob", function () {
   describe("#sendFoundNode", function () {
-    it("should clear the lists of listeners for ICECandidate and answer after a successful FIND_NODE.", function () {
-      assert(0);
+    it("should clear the list of listeners for answer after a successful FIND_NODE.", function () {
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
@@ -2573,8 +2620,16 @@ describe("KademliaRemoteNodeBob", function () {
       assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
 
       // Make sure the listeners are empty.
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
       assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+
+      for (key in bob.knownPeers) {
+        var peer = bob.knownPeers[key];
+        // XXX we can't clear the ice candidates right after sending the
+        // FOUND_NODE because alice won't even *start* sending ICE candidates
+        // until after receiving the FOUND_NODE.
+        // assert.deepEqual(peer.listeners['ICECandidate'], {});
+        assert.deepEqual(peer.listeners['answer'], {});
+      }
     });
     
   });
