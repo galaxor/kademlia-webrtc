@@ -2791,7 +2791,6 @@ describe("KademliaRemoteNodeCraig", function () {
     });
 
     it("should clear the list of listeners for ICECandidate after timeout when waiting to open the data channel.", function () {
-      assert(0);
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
@@ -2810,23 +2809,29 @@ describe("KademliaRemoteNodeCraig", function () {
       // friends.
       var responseCraigs = null;
 
+      // Craig will never get an ICECandidate from Alice.
+      var iceCandidatesBlocked = 0;
+      KademliaRemoteNodeCraig.prototype.recvIceCandidate = function (aliceKey, alicePeer, candidate) {
+        iceCandidatesBlocked++;
+      };
+
       participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
         responseCraigs = craigs;
       });
 
-      kademlia.mockTime.advance(1000);
+      kademlia.mockTime.advance(5500);
+
+      assert.equal(iceCandidatesBlocked, 1);
 
       assert.notEqual(responseCraigs, null);
 
-      assert.equal(Object.keys(responseCraigs).length, 1);
-
-      assert.equal(Object.keys(responseCraigs)[0], craigKey);
-
-      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+      assert.equal(Object.keys(responseCraigs).length, 0);
 
       // Make sure the listeners are empty.
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
+      // participants2 is the match between Bob and Craig.  In the parlance of
+      // that object, "alice" is what we globally call Bob, and "bob" is what
+      // we globally call Craig.  So, participants2.aliceAccordingToBob is Craig's view of Bob.
+      assert.deepEqual(participants2.aliceAccordingToBob.listeners['ICECandidate'], {});
     });
   });
 });

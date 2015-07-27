@@ -1481,6 +1481,8 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
  * happen after this.pendingPeerTimeout msec, so we will give up.
  */
 KademliaRemoteNodeCraig.prototype.abandonPendingPeer = function (aliceKey) {
+  debugger;
+  this._cancelIceListener(aliceKey, true);
   delete this.pendingPeers[aliceKey];
 };
 
