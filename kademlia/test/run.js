@@ -146,7 +146,38 @@ describe("KademliaDHT", function () {
   // XXX test the different forms of the constructor.
   describe("#constructor", function () {
     it("things should work when B > 32", function () {
-      assert(0);
+      // We'll set B to 256 and make sure everything can make a complete round trip.
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '0000000000000000000000000000000000000000000000000000000000000000';
+      var bobKey   = '1000000000000000000000000000000000000000000000000000000000000000';
+      var craigKey = '4000000000000000000000000000000000000000000000000000000000000000';
+
+      var alice = new kademlia.KademliaDHT({B: 256, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 256, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 256, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
     });
   });
 
