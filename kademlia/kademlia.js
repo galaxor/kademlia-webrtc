@@ -1409,7 +1409,11 @@ KademliaRemoteNodeCraig.prototype.recvIceCandidate = function (aliceKey, alicePe
 /**
  * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
  */
-KademliaRemoteNodeCraig.prototype._cancelIceListener = function (aliceKey) {
+KademliaRemoteNodeCraig.prototype._cancelIceListener = function (aliceKey, cancelTimeout) {
+  if (cancelTimeout) {
+    clearTimeout(this.node.iceTimeouts[aliceKey][this.node.dht.id]);
+  }
+
   delete this.node.iceTimeouts[aliceKey][this.node.dht.id];
   delete this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id];
   if (Object.keys(this.node.iceTimeouts[aliceKey]).length == 0) {
@@ -1438,7 +1442,8 @@ KademliaRemoteNodeCraig.prototype.sendAnswer = function (aliceKey, searchSerial,
 
 /**
  * Removes the WebRTCPeer from the pendingPeers, cancel the abandonment
- * timeout, create a KademliaRemoteNode, and add it to the buckets.
+ * timeout, cancel ICECandidate listeners, create a KademliaRemoteNode, and add
+ * it to the buckets.
  */
 KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, channel) {
   clearTimeout(this.pendingPeers[aliceKey].timeout);
@@ -1456,6 +1461,9 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
   };
 
   peer.addChannelMessageHandler('dht', onMessage);
+
+  // Cancel ICECandidate listener and timeout.
+  this._cancelIceListener(aliceKey, true);
 
   // XXX Set the onClose handler.
 

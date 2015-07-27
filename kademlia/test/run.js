@@ -2071,12 +2071,12 @@ describe("KademliaRemoteNodeAlice", function () {
         '00000100', '00000101', '00000102'
       ];
 
-      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
-      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'ignore'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'ignore'});
 
       var craigs = [];
       for (var i=0; i<craigKeys.length; i++) {
-        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4, unexpectedMsg: 'throw'}));
+        craigs.push(new kademlia.KademliaDHT({B: 32, id: craigKeys[i], k: 4, unexpectedMsg: 'ignore'}));
         matchMake(bob, craigs[craigs.length-1], kademlia);
       }
 
@@ -2744,7 +2744,6 @@ describe("KademliaRemoteNodeCraig", function () {
 
   describe("#recvOffer", function () {
     it("should clear the list of listeners for ICECandidate after the data channel opens.", function () {
-      assert(0);
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
@@ -2767,6 +2766,19 @@ describe("KademliaRemoteNodeCraig", function () {
         responseCraigs = craigs;
       });
 
+      var origDataChannelOpen = kademlia.WebRTCPeer.prototype._dataChannelOpen;
+      kademlia.WebRTCPeer.prototype._dataChannelOpen = function (channel) {
+        origDataChannelOpen.call(this, channel);
+
+        // Make sure the listeners are empty.
+        // We want to check Craig's listeners that are listening for Bob.
+        // participants2 has two participants: Bob and Craig.  But in the
+        // parlance of participants2, Bob is called Alice and Craig is called
+        // Bob.  The KademliaRemoteNode that represents Craig communicating with
+        // Bob is, therefore, participants2.aliceAccordingToBob.
+        assert.deepEqual(participants2.aliceAccordingToBob.listeners['ICECandidate'], {});
+      };
+
       kademlia.mockTime.advance(1000);
 
       assert.notEqual(responseCraigs, null);
@@ -2776,10 +2788,6 @@ describe("KademliaRemoteNodeCraig", function () {
       assert.equal(Object.keys(responseCraigs)[0], craigKey);
 
       assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
-
-      // Make sure the listeners are empty.
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['FOUND_NODE'], {});
-      assert.deepEqual(participants.bobAccordingToAlice.listeners['ICECandidate'], {});
     });
 
     it("should clear the list of listeners for ICECandidate after timeout when waiting to open the data channel.", function () {
