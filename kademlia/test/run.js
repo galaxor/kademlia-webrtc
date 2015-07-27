@@ -181,7 +181,76 @@ describe("KademliaDHT", function () {
     });
   });
 
-  // XXX test _insertNode.
+  describe("#_insertNode", function () {
+    it("can insert a node in the last bucket", function () {
+      var kademlia = require("../kademlia");
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+      var key1 = '80000001';
+      var node = new kademlia.KademliaRemoteNode({id: key1, peer: null});
+      dht._insertNode(node);
+      assert.deepEqual(Object.keys(dht.knownPeers), ['80000001']);
+      assert.equal(dht.knownPeers[key1].id, key1);
+      assert.deepEqual(Object.keys(dht.buckets[31]), ['80000001']);
+    });
+
+    it("can insert a node in the first bucket", function () {
+      var kademlia = require("../kademlia");
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+      var key1 = '00000001';
+      var node = new kademlia.KademliaRemoteNode({id: key1, peer: null});
+      dht._insertNode(node);
+      assert.deepEqual(Object.keys(dht.knownPeers), ['00000001']);
+      assert.equal(dht.knownPeers[key1].id, key1);
+      assert.deepEqual(Object.keys(dht.buckets[0]), ['00000001']);
+    });
+  });
+
+  describe("#_removeNode", function () {
+    it("can remove the last node", function () {
+      var kademlia = require("../kademlia");
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+      var key1 = '80000001';
+      var node = new kademlia.KademliaRemoteNode({id: key1, peer: null});
+      dht._insertNode(node);
+      assert.deepEqual(Object.keys(dht.knownPeers), ['80000001']);
+      assert.equal(dht.knownPeers[key1].id, key1);
+      assert.deepEqual(Object.keys(dht.buckets[31]), ['80000001']);
+
+      dht._removeNode('80000001');
+      assert.deepEqual(Object.keys(dht.knownPeers), []);
+      for (var i=0; i<32; i++) {
+        assert.deepEqual(Object.keys(dht.buckets[i]), {});
+      }
+    });
+
+    it("can remove the last node from a bucket and leave other buckets alone", function () {
+      var kademlia = require("../kademlia");
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+
+      var keys = ['00000001', '00000002', '80000001'];
+      for (var i=0; i<keys.length; i++) {
+        var node = new kademlia.KademliaRemoteNode({id: keys[i], peer: null});
+        dht._insertNode(node);
+      }
+
+      assert.deepEqual(Object.keys(dht.knownPeers).sort(), ['00000001', '00000002', '80000001']);
+      for (var i=0; i<keys.length; i++) {
+        assert.equal(dht.knownPeers[keys[i]].id, keys[i]);
+      }
+      assert.deepEqual(Object.keys(dht.buckets[0]), ['00000001']);
+      assert.deepEqual(Object.keys(dht.buckets[1]), ['00000002']);
+      assert.deepEqual(Object.keys(dht.buckets[31]), ['80000001']);
+
+      dht._removeNode('80000001');
+      assert.deepEqual(Object.keys(dht.knownPeers), ['00000001', '00000002']);
+      assert.deepEqual(Object.keys(dht.buckets[0]), ['00000001']);
+      assert.deepEqual(Object.keys(dht.buckets[1]), ['00000002']);
+      for (var i=3; i<32; i++) {
+        assert.deepEqual(Object.keys(dht.buckets[i]), {});
+      }
+    });
+  });
+  
 
   describe("#_pruneBucket", function () {
     it("should prune arbitrarily overfull buckets", function () {

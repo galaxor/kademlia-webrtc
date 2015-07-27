@@ -328,6 +328,16 @@ KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
 };
 
 /**
+ * Remove a node from the DHT.
+ */
+KademliaDHT.prototype._removeNode = function (key) {
+  delete this.knownPeers[key];
+  var bitId = bitOps.hex2BitStream(key);
+  var bucketIndex = this._findBucketIndex(bitId);
+  delete this.buckets[bucketIndex][key];
+};
+
+/**
  * The following functions are called by a callback function from one of the
  * WebRTCPeer objects that this KademliaDHT owns.  (The KademliaDHT will own
  * one WebRTCPeer object for each connection it has with a remote peer).
