@@ -770,6 +770,34 @@ KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, i
 
 
 /**
+ * Add newly-found peers to our buckets.  Then call the user-specified callback.
+ * @param callback function with signature callback({key:<hex key>, peer:<a WebRTCPeer object with communication open>, ...})
+ * @param responsePeers {key:<hex key>, peer:<a WebRTCPeer object with communication open>, ...}
+ */
+KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePeers) {
+  for (key in responsePeers) {
+    var node = responsePeers[key];
+
+    // Add the newcomers to the buckets.
+    // XXX What if the bucket is full?  Are we sure we want to keep this node and
+    // not another one?  If we were gonna not accept this node, perhaps we
+    // shoulda informed Craig before we promised to talk to them.  For now, we
+    // will punt this decision to the normal _insertNode mechanisms, which will
+    // call _chooseNodeToPrune.
+    this.node.dht._insertNode(node, true);
+
+    // Set the onClose handler.
+    var alice = this;
+    node.peer.addDataChannelCloseHandler = function (label, handler) {
+      alice.node.dht._removeNode(key);
+    };
+  }
+
+  callback(responsePeers);
+};
+
+
+/**
  * Send a FIND_NODE primitive to the remote side.
  * Here, we are acting as Alice.  The remote side is acting as Bob.  The remote
  * side will unpack all the offers we sent and send them to individual nodes
@@ -777,9 +805,13 @@ KademliaRemoteNodeAlice.prototype._cancelIceListener = function (searchSerial, i
  * Bob will collect the answers it gets in response and pass them back to us
  * when it's gotten them all.
  * @param string key The hex representation of the key we're looking for.
- * @param function callback This will be called when everybody who's gonna answer has answered.  The signature is callback({key:<hex key>, peer:<a WebRTCPeer object with communication open>, ...})
+ * @param function returnCallback This will be called when everybody who's gonna answer has answered.  The signature is callback({key:<hex key>, peer:<a WebRTCPeer object with communication open>, ...})
  */
-KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, callback) {
+KademliaRemoteNodeAlice.prototype.sendFindNodePrimitive = function (key, returnCallback) {
+  // Whatever the caller wants to do with these peers, let's make sure to
+  // update our buckets.
+  var callback = KademliaRemoteNodeAlice.prototype.receivePeers.bind(this, returnCallback);
+
   // When we get the answer back, it will be over the network.  What we need to
   // do is register a thing to listen for the appropriate message and when we
   // get it, call the callback.
@@ -1475,8 +1507,6 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
   // Cancel ICECandidate listener and timeout.
   this._cancelIceListener(aliceKey, true);
 
-  // XXX Set the onClose handler.
-
   // Add the newcomer to the buckets.
   // XXX What if the bucket is full?  Are we sure we want to keep this node and
   // not another one?  If we were gonna not accept this node, perhaps we
@@ -1484,6 +1514,13 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
   // will punt this decision to the normal _insertNode mechanisms, which will
   // call _chooseNodeToPrune.
   this.node.dht._insertNode(alice, true);
+
+  // Set the onClose handler.
+  var craig = this;
+  peer.addDataChannelCloseHandler = function (label, handler) {
+    craig.node.dht._removeNode(aliceKey);
+  };
+
 };
 
 /**

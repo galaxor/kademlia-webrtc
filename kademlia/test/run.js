@@ -2682,6 +2682,101 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.equal(typeof participantsAB.bobAccordingToAlice.iceTimeouts[participantsAB.bobAccordingToAlice.dht.id], "undefined");
     });
   });
+
+  describe("#receivePeers", function () {
+    it("should call receivePeers before returning the response", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      var orig_receivePeers = KademliaRemoteNodeAlice.prototype.receivePeers;
+
+      var receivePeersCalled = 0;
+
+      KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePeers) {
+        receivePeersCalled++;
+        orig_receivePeers.call(this, callback, responsePeers);
+      };
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      assert.equal(receivePeersCalled, 1);
+    });
+
+    it("should put new peers into knownPeers and buckets", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      var orig_receivePeers = KademliaRemoteNodeAlice.prototype.receivePeers;
+
+      var receivePeersCalled = 0;
+
+      KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePeers) {
+        receivePeersCalled++;
+        orig_receivePeers.call(this, callback, responsePeers);
+      };
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      assert.equal(receivePeersCalled, 1);
+
+      assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey, craigKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[30]), [craigKey]);
+    });
+  });
 });
 
 describe("KademliaRemoteNodeBob", function () {
@@ -2840,9 +2935,7 @@ describe("KademliaRemoteNodeCraig", function () {
       // can see other things happen instead.
       assert.deepEqual(responseCraigs1, null);
     });
-  });
 
-  describe("#recvOffer", function () {
     it("should clear the list of listeners for ICECandidate after the data channel opens.", function () {
       var kademlia = mockTimedKademlia();
 
@@ -2932,6 +3025,56 @@ describe("KademliaRemoteNodeCraig", function () {
       // that object, "alice" is what we globally call Bob, and "bob" is what
       // we globally call Craig.  So, participants2.aliceAccordingToBob is Craig's view of Bob.
       assert.deepEqual(participants2.aliceAccordingToBob.listeners['ICECandidate'], {});
+    });
+  });
+
+  describe("#onDataChannelOpen", function () {
+    it("should put Alice into knownPeers and buckets", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      var orig_receivePeers = KademliaRemoteNodeAlice.prototype.receivePeers;
+
+      var receivePeersCalled = 0;
+
+      KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePeers) {
+        receivePeersCalled++;
+        orig_receivePeers.call(this, callback, responsePeers);
+      };
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      assert.equal(receivePeersCalled, 1);
+
+      assert.deepEqual(Object.keys(craig.knownPeers).sort(), [aliceKey, bobKey].sort());
+      assert.deepEqual(Object.keys(craig.buckets[30]).sort(), [aliceKey, bobKey].sort());
     });
   });
 });
