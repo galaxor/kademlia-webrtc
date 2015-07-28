@@ -163,4 +163,15 @@ wrtc.RTCDataChannel.prototype.open = function () {
   }
 };
 
+wrtc.RTCDataChannel.prototype.close = function () {
+  var chan = this;
+
+  this.isOpen = true;
+  if (typeof this.onclose == "function") {
+    setTimeout(function () {
+      chan.onclose();
+    }, 0);
+  }
+};
+
 module.exports = exports = wrtc;

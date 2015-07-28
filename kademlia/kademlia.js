@@ -605,8 +605,7 @@ KademliaRemoteNodeCraig = function (node) {
 };
 
 KademliaRemoteNode.prototype.close = function () {
-  // We aren't really networked yet.  When we are, we will call:
-  // this.peer.close();
+  this.peer.close();
 };
 
 /**

@@ -261,7 +261,13 @@ describe("KademliaDHT", function () {
 
       // Insert nodes until the bucket is full.  Insert five more.
       for (var i=0; i<dht.k+5; i++) {
-        var node = new kademlia.KademliaRemoteNode({id: key1, peer: null});
+        // Getting pruned will cause the "close" method to get called.  We
+        // better make sure that's a real thing.
+        var fakePeer = {};
+        fakePeer.close = function () {
+          // do nothing
+        };
+        var node = new kademlia.KademliaRemoteNode({id: key1, peer: fakePeer});
 
         // Add 1 to the key, so that the next key we create is 1 more.
         var key0 = (parseInt(key1, 16) + 1).toString(16);
@@ -3030,6 +3036,56 @@ describe("KademliaRemoteNodeCraig", function () {
 
   describe("#onDataChannelOpen", function () {
     it("should put Alice into knownPeers and buckets", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      var orig_receivePeers = KademliaRemoteNodeAlice.prototype.receivePeers;
+
+      var receivePeersCalled = 0;
+
+      KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePeers) {
+        receivePeersCalled++;
+        orig_receivePeers.call(this, callback, responsePeers);
+      };
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      assert.equal(receivePeersCalled, 1);
+
+      assert.deepEqual(Object.keys(craig.knownPeers).sort(), [aliceKey, bobKey].sort());
+      assert.deepEqual(Object.keys(craig.buckets[30]).sort(), [aliceKey, bobKey].sort());
+    });
+
+    it("should set up the onClose handler to remove Alice when the connection is closed", function () {
+      assert(0);
+
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
