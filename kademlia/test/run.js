@@ -2885,14 +2885,16 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.equal(receivePeersCalled, 1);
 
       assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey, craigKey].sort());
-      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [bobKey, craigKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[28]).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [craigKey].sort());
 
       alice.knownPeers[craigKey].close();
 
       kademlia.mockTime.advance(1);
 
       assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey].sort());
-      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[28]).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [].sort());
     });
   });
 });
