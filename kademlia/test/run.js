@@ -2782,6 +2782,118 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey, craigKey].sort());
       assert.deepEqual(Object.keys(alice.buckets[30]), [craigKey]);
     });
+
+    it("should set up the onClose handler to remove Craig when Craig closes the connection", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      var orig_receivePeers = KademliaRemoteNodeAlice.prototype.receivePeers;
+
+      var receivePeersCalled = 0;
+
+      KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePeers) {
+        receivePeersCalled++;
+        orig_receivePeers.call(this, callback, responsePeers);
+      };
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      assert.equal(receivePeersCalled, 1);
+
+      assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey, craigKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[28]).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [craigKey].sort());
+
+      craig.knownPeers[aliceKey].close();
+
+      kademlia.mockTime.advance(1);
+
+      assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[28]).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [].sort());
+    });
+
+    it("should set up the onClose handler to remove Craig when Alice closes the connection", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      var orig_receivePeers = KademliaRemoteNodeAlice.prototype.receivePeers;
+
+      var receivePeersCalled = 0;
+
+      KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePeers) {
+        receivePeersCalled++;
+        orig_receivePeers.call(this, callback, responsePeers);
+      };
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      assert.equal(receivePeersCalled, 1);
+
+      assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey, craigKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [bobKey, craigKey].sort());
+
+      alice.knownPeers[craigKey].close();
+
+      kademlia.mockTime.advance(1);
+
+      assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [bobKey].sort());
+    });
   });
 });
 
@@ -3084,8 +3196,6 @@ describe("KademliaRemoteNodeCraig", function () {
     });
 
     it("should set up the onClose handler to remove Alice when the connection is closed", function () {
-      assert(0);
-
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
@@ -3131,6 +3241,13 @@ describe("KademliaRemoteNodeCraig", function () {
 
       assert.deepEqual(Object.keys(craig.knownPeers).sort(), [aliceKey, bobKey].sort());
       assert.deepEqual(Object.keys(craig.buckets[30]).sort(), [aliceKey, bobKey].sort());
+
+      craig.knownPeers[aliceKey].close();
+
+      kademlia.mockTime.advance(1);
+
+      assert.deepEqual(Object.keys(craig.knownPeers).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(craig.buckets[30]).sort(), [bobKey].sort());
     });
   });
 });

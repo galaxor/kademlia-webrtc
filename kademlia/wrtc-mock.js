@@ -122,6 +122,8 @@ wrtc.RTCDataChannel = function (label, peer) {
   this.label = label;
   this.peer = peer;
   this.isOpen = false;
+  this.openHandlersCalled = false;
+  this.closeHandlersCalled = false;
 };
 
 wrtc.RTCDataChannel.prototype.send = function (msg) {
@@ -157,7 +159,17 @@ wrtc.RTCDataChannel.prototype.open = function () {
     this.isOpen = true;
     if (typeof this.onopen == "function") {
       setTimeout(function () {
-        chan.onopen();
+        if (!chan.openHandlersCalled) {
+          chan.openHandlersCalled = true;
+          chan.onopen();
+        }
+
+        if (typeof chan.peer.remoteEnd.dataChannels[this.label].onopen == "function"
+            && !chan.peer.remoteEnd.dataChannels[this.label].openHandlersCalled) 
+        {
+          chan.peer.remoteEnd.dataChannels[this.label].openHandlersCalled = true;
+          chan.peer.remoteEnd.dataChannels[this.label].onopen();
+        }
       }, 0);
     }
   }
@@ -166,10 +178,19 @@ wrtc.RTCDataChannel.prototype.open = function () {
 wrtc.RTCDataChannel.prototype.close = function () {
   var chan = this;
 
-  this.isOpen = true;
+  this.isOpen = false;
   if (typeof this.onclose == "function") {
     setTimeout(function () {
-      chan.onclose();
+      if (!chan.closeHandlersCalled) {
+        chan.closeHandlersCalled = true;
+        chan.onclose();
+      }
+      if (typeof chan.peer.remoteEnd.dataChannels[this.label].onclose == "function"
+          && !chan.peer.remoteEnd.dataChannels[this.label].closeHandlersCalled)
+      {
+        chan.peer.remoteEnd.dataChannels[this.label].closeHandlersCalled = true;
+        chan.peer.remoteEnd.dataChannels[this.label].onclose();
+      }
     }, 0);
   }
 };

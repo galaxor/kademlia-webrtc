@@ -787,9 +787,9 @@ KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePee
 
     // Set the onClose handler.
     var alice = this;
-    node.peer.addDataChannelCloseHandler = function (label, handler) {
+    node.peer.addDataChannelCloseHandler('dht', function (peer, channel) {
       alice.node.dht._removeNode(key);
-    };
+    });
   }
 
   callback(responsePeers);
@@ -1487,6 +1487,7 @@ KademliaRemoteNodeCraig.prototype.sendAnswer = function (aliceKey, searchSerial,
  * it to the buckets.
  */
 KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, channel) {
+  debugger;
   clearTimeout(this.pendingPeers[aliceKey].timeout);
   delete this.pendingPeers[aliceKey];
 
@@ -1516,9 +1517,9 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
 
   // Set the onClose handler.
   var craig = this;
-  peer.addDataChannelCloseHandler = function (label, handler) {
+  peer.addDataChannelCloseHandler('dht', function (peer, channel) {
     craig.node.dht._removeNode(aliceKey);
-  };
+  });
 
 };
 
@@ -1527,7 +1528,6 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
  * happen after this.pendingPeerTimeout msec, so we will give up.
  */
 KademliaRemoteNodeCraig.prototype.abandonPendingPeer = function (aliceKey) {
-  debugger;
   this._cancelIceListener(aliceKey, true);
   delete this.pendingPeers[aliceKey];
 };
