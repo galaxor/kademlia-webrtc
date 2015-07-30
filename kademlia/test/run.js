@@ -324,14 +324,95 @@ describe("KademliaDHT", function () {
     });
 
     it("should prune the least recently seen node from the bucket and from knownPeers", function () {
-      assert(0);
+      var kademlia = require("../kademlia");
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+      var key1 = '80000001';
+
+      // Insert nodes until the bucket is full.  Insert five more.
+      for (var i=0; i<dht.k+5; i++) {
+        // Getting pruned will cause the "close" method to get called.  We
+        // better make sure that's a real thing.
+        var fakePeer = {};
+        fakePeer.close = function () {
+          // do nothing
+        };
+        var node = new kademlia.KademliaRemoteNode({id: key1, peer: fakePeer});
+        node.lastSeen = i;
+
+        // Add 1 to the key, so that the next key we create is 1 more.
+        var key0 = (parseInt(key1, 16) + 1).toString(16);
+
+        // Zero-pad the string.
+        for (key1 = ''; key1.length < 8-key0.length; key1 += '0') { }
+        key1 += key0;
+
+        dht._insertNode(node);
+      }
+
+      // Prune the bucket.
+      dht._pruneBucket(31);
+
+      assert.equal(Object.keys(dht.buckets[31]).length, dht.k);
+      for (key in dht.buckets[31]) {
+        assert(dht.buckets[31][key].lastSeen > 0);
+      }
+
+      assert.equal(Object.keys(dht.knownPeers).length, dht.k);
+      for (key in dht.knownPeers) {
+        assert(dht.knownPeers[key].lastSeen > 0);
+      }
     });
 
     it("should close the channel while pruning", function () {
-      // XXX Currently, we do not wait for the channel to finish closing and
-      // running its onclose handlers before returning from the pruning
-      // operation.  Should we??
-      assert(0);
+      var kademlia = require("../kademlia");
+
+      var dht = new kademlia.KademliaDHT({B: 32, id: '00000000'});
+      var key1 = '80000001';
+
+      // Insert nodes until the bucket is full.  Insert five more.
+      for (var i=0; i<dht.k+5; i++) {
+        // Getting pruned will cause the "close" method to get called.  We
+        // better make sure that's a real thing.
+        var fakePeer = {};
+        fakePeer.close = function () {
+          // do nothing
+        };
+        var node = new kademlia.KademliaRemoteNode({id: key1, peer: fakePeer});
+        node.lastSeen = i;
+
+        // Add 1 to the key, so that the next key we create is 1 more.
+        var key0 = (parseInt(key1, 16) + 1).toString(16);
+
+        // Zero-pad the string.
+        for (key1 = ''; key1.length < 8-key0.length; key1 += '0') { }
+        key1 += key0;
+
+        dht._insertNode(node);
+      }
+
+      var onCloseCalled = 0;
+
+      orig_close = kademlia.KademliaRemoteNode.prototype.close;
+      kademlia.KademliaRemoteNode.prototype.close = function () {
+        onCloseCalled++;
+        orig_close.call(this);
+      };
+
+      // Prune the bucket.
+      dht._pruneBucket(31);
+
+      assert.equal(Object.keys(dht.buckets[31]).length, dht.k);
+      for (key in dht.buckets[31]) {
+        assert(dht.buckets[31][key].lastSeen > 0);
+      }
+
+      assert.equal(Object.keys(dht.knownPeers).length, dht.k);
+      for (key in dht.knownPeers) {
+        assert(dht.knownPeers[key].lastSeen > 0);
+      }
+
+      assert.equal(onCloseCalled, 5);
     });
   });
 
