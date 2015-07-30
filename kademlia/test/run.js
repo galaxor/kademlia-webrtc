@@ -284,7 +284,7 @@ describe("KademliaDHT", function () {
 
       assert.equal(Object.keys(dht.buckets[31]).length, dht.k);
       for (key in dht.buckets[31]) {
-        assert(dht.buckets[31][key].lastSeen > 0);
+        assert(dht.buckets[31][key].lastSeen > 4);
       }
     });
   });
@@ -355,12 +355,12 @@ describe("KademliaDHT", function () {
 
       assert.equal(Object.keys(dht.buckets[31]).length, dht.k);
       for (key in dht.buckets[31]) {
-        assert(dht.buckets[31][key].lastSeen > 0);
+        assert(dht.buckets[31][key].lastSeen > 4);
       }
 
       assert.equal(Object.keys(dht.knownPeers).length, dht.k);
       for (key in dht.knownPeers) {
-        assert(dht.knownPeers[key].lastSeen > 0);
+        assert(dht.knownPeers[key].lastSeen > 4);
       }
     });
 
@@ -404,12 +404,12 @@ describe("KademliaDHT", function () {
 
       assert.equal(Object.keys(dht.buckets[31]).length, dht.k);
       for (key in dht.buckets[31]) {
-        assert(dht.buckets[31][key].lastSeen > 0);
+        assert(dht.buckets[31][key].lastSeen > 4);
       }
 
       assert.equal(Object.keys(dht.knownPeers).length, dht.k);
       for (key in dht.knownPeers) {
-        assert(dht.knownPeers[key].lastSeen > 0);
+        assert(dht.knownPeers[key].lastSeen > 4);
       }
 
       assert.equal(onCloseCalled, 5);
