@@ -1570,7 +1570,7 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
     craig.node.dht._removeNode(aliceKey);
 
     // Inform the application that this happened.
-    if (typeof craig.node.dht.onClose == "undefined") {
+    if (typeof craig.node.dht.onClose == "function") {
       craig.node.dht.onClose(craig.node.dht, aliceKey);
     }
   });
