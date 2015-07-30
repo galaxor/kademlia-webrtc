@@ -7,7 +7,10 @@ var timers = require('timers');
 var setTimeout = timers.setTimeout;
 var clearTimeout = timers.clearTimeout;
 
-var now = timers.now;
+// We want a now() function that works in real life, but also can be mocked for
+// testing.  I don't know if the mock() function can replace the built-in
+// Date.now function, so I'll just stick time-mock's now function in timers.
+var now = (typeof timers.now == "function")? timers.now : Date.now;
 
 /**
  * Create a distributed hash table using the Kademlia protocol as specified here:
@@ -301,30 +304,41 @@ KademliaDHT.prototype._pruneBucket = function (bucketIndex) {
   var nmemb = keys.length;
   if (nmemb > this.k) {
     for (var i=nmemb; i>this.k; i--) {
-      var pruneIndex = this._chooseNodeToPrune(this.buckets[bucketIndex]);
-      var pruneKey = keys[pruneIndex];
-      keys[pruneIndex] = keys[i-1];
+      var pruneKey = this._chooseNodeToPrune(this.buckets[bucketIndex]);
 
       this.buckets[bucketIndex][pruneKey].close();
+      // XXX These things should maybe happen as a callback after the close() function.
       delete this.buckets[bucketIndex][pruneKey];
+      delete this.knownPeers[pruneKey];
     }
   }
 };
 
 /**
  * Choose a node to prune out of the bucket.
- * In standard kademlia, we would use some sort of "last contacted" metric to
- * determine who was not a good node.
- * I'm not sure we need that here, because with WebRTC, all our connections are
- * guaranteed to be up and to have sent us keepalive packets (I think).  So we
- * have nothing to recommend one node over another here.  Unless we come up
- * with some other statistic, like RTT maybe.
- * For now, just pick random ones to prune (if pruning is indeed needed).
+ * Choose the least-recently-seen node in the bucket.
  */
 KademliaDHT.prototype._chooseNodeToPrune = function (bucket) {
   var keys = Object.keys(bucket);
-  var pruneIndex = Math.floor(Math.random() * keys.length);
-  return pruneIndex;
+
+  var leastRecentlySeenIndex = null;
+  var leastRecentlySeenTime = null;
+  var pruneKey = null;
+
+  // A node won't ever get put into the buckets and knownPeers until we've
+  // heard something from it, so we don't have to worry about any of the
+  // lastSeens being null.
+  for (var i=0; i<keys.length; i++) {
+    var lastSeenTime = this.knownPeers[keys[i]].lastSeen;
+    if (leastRecentlySeenTime == null || leastRecentlySeenTime > lastSeenTime) {
+      leastRecentlySeenTime = lastSeenTime;
+      leastRecentlySeenIndex = i;
+    }
+  }
+
+  pruneKey = keys[leastRecentlySeenIndex];
+  
+  return pruneKey;
 };
 
 /**
@@ -557,6 +571,12 @@ function KademliaRemoteNode(args) {
     'answer': {},
     'ICECandidate': {},
   };
+
+  // Keep track of when the node was last seen.  This will be updated whenever
+  // we get a message of any kind from the node.  It will be used by
+  // KademliaDHT._chooseNodeToPrune when it's time to prune a bucket:  We will
+  // prune the least-recently used.
+  this.lastSeen = null;
 
   // We will set up timeouts for ICE Candidate listeners.  If the channel
   // doesn't open during that time, we will remove the listener.  If the
@@ -1070,6 +1090,13 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
  * We will leave it up to the function we call to remove itself from the list, though.  Because maybe we wanted to receive multiple instances of that message.
  */
 KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
+  // Even if they send a malformed message, update lastSeen.  Mostly, just
+  // because otherwise the code for updating lastSeen is spread throughout the
+  // rest of this function and is more likely to be wrong, because for each
+  // type of message, it takes us a few checks before we know if it's
+  // well-formed.
+  this.lastSeen = now();
+
   if (typeof data.op != "string") {
     throw new MalformedError("Malformed");
   }
