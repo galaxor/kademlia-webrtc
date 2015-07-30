@@ -2761,7 +2761,7 @@ describe("KademliaRemoteNodeAlice", function () {
 
       var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw', onOpen: onOpen});
       var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
-      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw', onOpen: onOpen});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw'});
 
       var participants = matchMake(alice, bob, kademlia);
       var participants2 = matchMake(bob, craig, kademlia);
@@ -2788,8 +2788,6 @@ describe("KademliaRemoteNodeAlice", function () {
       var chansShouldOpened = {};
       chansShouldOpened[aliceKey] = {}
       chansShouldOpened[aliceKey][craigKey] = true;
-      chansShouldOpened[craigKey] = {};
-      chansShouldOpened[craigKey][aliceKey] = true;
 
       assert.deepEqual(chansOpened, chansShouldOpened);
     });
@@ -3431,6 +3429,55 @@ describe("KademliaRemoteNodeCraig", function () {
 
       assert.deepEqual(Object.keys(craig.knownPeers).sort(), [bobKey].sort());
       assert.deepEqual(Object.keys(craig.buckets[30]).sort(), [bobKey].sort());
+    });
+
+    it("calls the app-requested global onOpen handler", function () {
+      var kademlia = mockTimedKademlia();
+
+      var aliceKey = '00000000';
+      var bobKey   = '10000000';
+      var craigKey = '40000000';
+
+      var chansOpened = {};
+
+      var onOpen = function (dht, node) {
+        if (typeof chansOpened[dht.id] == "undefined") {
+          chansOpened[dht.id] = {};
+        }
+        chansOpened[dht.id][node.id] = true;
+      };
+
+      var alice = new kademlia.KademliaDHT({B: 32, id: aliceKey, k: 4, unexpectedMsg: 'throw'});
+      var bob = new kademlia.KademliaDHT({B: 32, id: bobKey, k: 4, unexpectedMsg: 'throw'});
+      var craig = new kademlia.KademliaDHT({B: 32, id: craigKey, k: 4, unexpectedMsg: 'throw', onOpen: onOpen});
+
+      var participants = matchMake(alice, bob, kademlia);
+      var participants2 = matchMake(bob, craig, kademlia);
+
+      // Now we have an Alice who knows about Bob, and a Bob, who knows about
+      // Alice and Craig.  Let's see what happens when Alice asks for some
+      // friends.
+      var responseCraigs = null;
+
+      participants.bobAccordingToAlice.asAlice.sendFindNodePrimitive('00000000', function (craigs) {
+        responseCraigs = craigs;
+      });
+
+      kademlia.mockTime.advance(1000);
+
+      assert.notEqual(responseCraigs, null);
+
+      assert.equal(Object.keys(responseCraigs).length, 1);
+
+      assert.equal(Object.keys(responseCraigs)[0], craigKey);
+
+      assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
+
+      var chansShouldOpened = {};
+      chansShouldOpened[craigKey] = {};
+      chansShouldOpened[craigKey][aliceKey] = true;
+
+      assert.deepEqual(chansOpened, chansShouldOpened);
     });
   });
 });
