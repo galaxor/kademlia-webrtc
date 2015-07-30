@@ -44,6 +44,12 @@ var now = (typeof timers.now == "function")? timers.now : Date.now;
  *    channelOpenTimeout - integer in msec (default: 500): After this amount of
  *                      time, Alice will give up on the Craigs opening a
  *                      channel, and return what we have managed to open so far.
+ *    onOpen - function (default: null):  If this is not null, then it will be
+ *                      called each time a data channel is open, with the signature
+ *                      onOpen(KademliaDHT, KademliaRemoteNode).
+ *    onClose - function (default: null):  If this is not null, then it will be
+ *                      called each time a data channel is closed, with the signature
+ *                      onClose(KademliaDHT, Kademlia ID).
  */
 function KademliaDHT(options) {
   var characteristics = {
@@ -59,6 +65,8 @@ function KademliaDHT(options) {
     channelOpenTimeout: 500,
     id: null,
     unexpectedMsg: 'ignore',
+    onOpen: null,
+    onClose: null,
   };
 
   // Set the defaults.
@@ -809,6 +817,11 @@ KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePee
     var alice = this;
     node.peer.addDataChannelCloseHandler('dht', function (peer, channel) {
       alice.node.dht._removeNode(key);
+
+      // Let the application know that this happened.
+      if (typeof alice.node.dht.onClose == "function") {
+        alice.node.dht.onClose(alice.node.dht, key);
+      }
     });
   }
 
@@ -1005,6 +1018,11 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
           };
 
           remoteNode.peer.addChannelMessageHandler('dht', onMessage);
+
+          // Let the application know this happened.
+          if (typeof node.dht.onOpen == 'function') {
+            node.dht.onOpen(node.dht, remoteNode);
+          }
 
           // Check all the searches that are waiting for this peer.  Add this
           // peer to the list of peers who have replied.  If this completes the set
@@ -1514,7 +1532,6 @@ KademliaRemoteNodeCraig.prototype.sendAnswer = function (aliceKey, searchSerial,
  * it to the buckets.
  */
 KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, channel) {
-  debugger;
   clearTimeout(this.pendingPeers[aliceKey].timeout);
   delete this.pendingPeers[aliceKey];
 
@@ -1528,6 +1545,11 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
   var onMessage = function (peer, channel, data) {
     alice.onMessage(aliceKey, data);
   };
+
+  // Let the application know this happened.
+  if (typeof this.node.dht.onOpen == "function") {
+    this.node.dht.onOpen(this.node.dht, alice);
+  }
 
   peer.addChannelMessageHandler('dht', onMessage);
 
@@ -1546,6 +1568,11 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
   var craig = this;
   peer.addDataChannelCloseHandler('dht', function (peer, channel) {
     craig.node.dht._removeNode(aliceKey);
+
+    // Inform the application that this happened.
+    if (typeof craig.node.dht.onClose == "undefined") {
+      craig.node.dht.onClose(craig.node.dht, aliceKey);
+    }
   });
 
 };
