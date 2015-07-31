@@ -44,6 +44,15 @@ var now = (typeof timers.now == "function")? timers.now : Date.now;
  *    channelOpenTimeout - integer in msec (default: 500): After this amount of
  *                      time, Alice will give up on the Craigs opening a
  *                      channel, and return what we have managed to open so far.
+ *    iceListenAfterOpenTimeout - integer in msec (default: 1000):  After a
+ *                      DataChannel opens, we will stop forwarding ICE
+ *                      Candidates through Bob and start sending them directly
+ *                      between Alice and Craig (through the DataChannel
+ *                      itself).  But the remote end may have sent a few
+ *                      ICECandidates before the DataChannel opens.  We don't
+ *                      want to miss those by stopping the listener right away.
+ *                      Wait this many msec before we stop listening for Bob to
+ *                      send us ICECandidates from our peer.
  *    onOpen - function (default: null):  If this is not null, then it will be
  *                      called each time a data channel is open, with the signature
  *                      onOpen(KademliaDHT, KademliaRemoteNode).
@@ -63,6 +72,7 @@ function KademliaDHT(options) {
     findNodeTimeout: 500,
     foundNodeTimeout: 600,
     channelOpenTimeout: 500,
+    iceListenAfterOpenTimeout: 1000,
     id: null,
     unexpectedMsg: 'ignore',
     onOpen: null,
@@ -1039,11 +1049,18 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
               // Also, get rid of the timeout.
               clearTimeout(node.dht.searchResolution[serial].timeout);
               delete node.listeners['FOUND_NODE'][serial];
-              delete node.listeners['ICECandidate'][node.dht.id][serial];
-              if (Object.keys(node.listeners['ICECandidate'][node.dht.id]).length == 0) {
-                delete node.listeners['ICECandidate'][node.dht.id];
-              }
+
+              // Keep listening for ICE Candidates for a little bit.  Future
+              // ICE Candidates will come through the DataChannel itself, but
+              // let's not miss any that they may have sent before we found one
+              // that worked.
               clearTimeout(node.asAlice.findNodeSearchesInitiated[serial].timeout);
+              setTimeout(function () {
+                delete node.listeners['ICECandidate'][node.dht.id][serial];
+                if (Object.keys(node.listeners['ICECandidate'][node.dht.id]).length == 0) {
+                  delete node.listeners['ICECandidate'][node.dht.id];
+                }
+              }, node.dht.iceListenAfterOpenTimeout);
               delete node.asAlice.findNodeSearchesInitiated[serial];
 
               node.dht.searchResolution[serial].callback(node.dht.searchResolution[serial].repliedPeers);
@@ -1087,6 +1104,10 @@ KademliaRemoteNodeAlice.prototype._recvFoundNode = function (searchedKey, search
     delete this.findNodeSearchesInitiated[searchSerial];
 
     delete this.node.listeners['FOUND_NODE'][searchSerial];
+
+    // We can close this ICE Listener right away.  We already have an open
+    // WebRTCPeerConnection to Craig.  We do not need this new one to open at
+    // all, so we can go ahead and stop listening for ICE Candidates on it.
     delete this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial];
     if (Object.keys(this.node.listeners['ICECandidate'][this.node.dht.id]).length == 0) {
       delete this.node.listeners['ICECandidate'][this.node.dht.id];
@@ -1500,12 +1521,18 @@ KademliaRemoteNodeCraig.prototype._cancelIceListener = function (aliceKey, cance
     clearTimeout(this.node.iceTimeouts[aliceKey][this.node.dht.id]);
   }
 
-  delete this.node.iceTimeouts[aliceKey][this.node.dht.id];
-  delete this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id];
-  if (Object.keys(this.node.iceTimeouts[aliceKey]).length == 0) {
-    delete this.node.iceTimeouts[aliceKey];
-    delete this.node.listeners['ICECandidate'][aliceKey];
-  }
+  // Keep listening for ICE Candidates for a little bit.  Future ICE Candidates
+  // will come through the DataChannel itself, but let's not miss any that they
+  // may have sent before we found one that worked.
+  var node = this.node;
+  setTimeout(function () {
+    delete node.iceTimeouts[aliceKey][node.dht.id];
+    delete node.listeners['ICECandidate'][aliceKey][node.dht.id];
+    if (Object.keys(node.iceTimeouts[aliceKey]).length == 0) {
+      delete node.iceTimeouts[aliceKey];
+      delete node.listeners['ICECandidate'][aliceKey];
+    }
+  }, this.node.dht.iceListenAfterOpenTimeout);
 };
 
 /**

@@ -3368,16 +3368,19 @@ describe("KademliaRemoteNodeCraig", function () {
       kademlia.WebRTCPeer.prototype._dataChannelOpen = function (channel) {
         origDataChannelOpen.call(this, channel);
 
-        // Make sure the listeners are empty.
+        // Make sure the listeners are empty (after
+        // iceListenAfterChannelOpenTimeout has passed).
         // We want to check Craig's listeners that are listening for Bob.
         // participants2 has two participants: Bob and Craig.  But in the
         // parlance of participants2, Bob is called Alice and Craig is called
         // Bob.  The KademliaRemoteNode that represents Craig communicating with
         // Bob is, therefore, participants2.aliceAccordingToBob.
-        assert.deepEqual(participants2.aliceAccordingToBob.listeners['ICECandidate'], {});
+        kademlia.mockTime.setTimeout(function () {
+          assert.deepEqual(participants2.aliceAccordingToBob.listeners['ICECandidate'], {});
+        }, 1000);
       };
 
-      kademlia.mockTime.advance(1000);
+      kademlia.mockTime.advance(2000);
 
       assert.notEqual(responseCraigs, null);
 
@@ -3425,10 +3428,11 @@ describe("KademliaRemoteNodeCraig", function () {
 
       assert.equal(Object.keys(responseCraigs).length, 0);
 
-      // Make sure the listeners are empty.
+      // Make sure the listeners are empty (after iceListenAfterChannelOpenTimeout has passed).
       // participants2 is the match between Bob and Craig.  In the parlance of
       // that object, "alice" is what we globally call Bob, and "bob" is what
       // we globally call Craig.  So, participants2.aliceAccordingToBob is Craig's view of Bob.
+      kademlia.mockTime.advance(1000);
       assert.deepEqual(participants2.aliceAccordingToBob.listeners['ICECandidate'], {});
     });
   });

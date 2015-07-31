@@ -48,3 +48,6 @@ These ICE candidate messages don't need to have a (serial, idx) because by this 
 Bob relays those to Craig.
 
 Communication is established!
+
+After communication is established, Alice and Craig may find better ICE candidates.  They can send them directly to each other.  They will look like this:
+{"op":"ICECandidate", "from":<hex rep of Alice's key>, "to":<hex rep of Craig's key>, "candidate":<whatever the ICE candidate thing is>}
