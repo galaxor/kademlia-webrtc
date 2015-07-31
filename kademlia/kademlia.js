@@ -1,4 +1,3 @@
-var crypt = require('crypto-lite').crypto;
 var bitCoder = require('bit-coder');
 
 var WebRTCPeer = require('WebRTCPeer');
