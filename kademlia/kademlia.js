@@ -449,8 +449,8 @@ KademliaDHT.prototype.recvFindNodePrimitive = function (findKey, requestorKey, s
         var offer = this.findNodeSearches[searchId].offers.pop();
         nodesTouched++;
 
-        // Start listening for Craig to send ICECandidate messages to Alice.
-        remoteNode.asBob.addIceListener(remoteNode.id, requestorKey);
+        // We do not need to set up a listener for ICE Candidates because Bob
+        // will always forward ICE Candidates between known peers.
 
         // Actually send the offer.
         remoteNode.asBob.sendOffer(findKey, offer, requestorKey, searchSerial, idx, this._recvAnswer.bind(this, searchId, returnCallback));
@@ -1247,7 +1247,7 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
     // this.node.listeners['ICECandidate'][this.node.dht.id][searchSerial][fromIdx] = this.recvIceCandidate.bind(this, searchSerial, fromIdx, peer);
 
     // Bob format
-    // this.node.listeners['ICECandidate'][fromKey][toKey] = this.forwardIceCandidate.bind(this, fromKey, toKey);
+    // Bob will forward all ICE Candidates to known peers, so there is no entry in the 'listeners' object.  We just call this.forwardIceCandidate.
 
     // Craig format
     // this.node.listeners['ICECandidate'][aliceKey][this.node.dht.id] = this.recvIceCandidate.bind(this, aliceKey, alicePeer);
@@ -1306,12 +1306,17 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
         throw new MalformedError("Malformed ICECandidate");
       }
 
-      if (typeof this.listeners['ICECandidate'][fromKey] != "undefined" 
-          && typeof this.listeners['ICECandidate'][fromKey][data.to] != "undefined") {
-        this.listeners['ICECandidate'][fromKey][data.to](data.candidate, data.serial, data.idx);
-      } else {
-        this.dht.handleUnexpected("Unexpected ICECandidate", data);
+      // We should check if the recipient is a known peer.  (We know the
+      // sender is a known peer because otherwise, they wouldn't have been
+      // able to send to us).  The forwardIceCandidate function will not
+      // check again.
+      var recipient = this.dht.knownPeers[data.to];
+      if (typeof recipient == "undefined") {
+        this.dht.handleUnexpected("Asked to forward to an unknown peer.", data);
+        return;
       }
+
+      this.asBob.forwardIceCandidate(fromKey, data.to, data.candidate, data.serial, data.idx);
     }
     
     break;
@@ -1331,19 +1336,6 @@ KademliaRemoteNode.prototype.onMessage = function (fromKey, data) {
   // remove those things.
 };
 
-KademliaRemoteNodeBob.prototype.addIceListener = function (fromKey, toKey) {
-  if (typeof this.node.listeners['ICECandidate'][fromKey] == "undefined") {
-    this.node.listeners['ICECandidate'][fromKey] = {};
-  }
-
-  this.node.listeners['ICECandidate'][fromKey][toKey] = this.forwardIceCandidate.bind(this, fromKey, toKey);
-  // Set up a timeout
-  if (typeof this.node.iceTimeouts[fromKey] == "undefined") {
-    this.node.iceTimeouts[fromKey] = {};
-  }
-  this.node.iceTimeouts[fromKey][toKey] = setTimeout(this._cancelIceListener.bind(this, fromKey, toKey), this.node.iceTimeout);
-};
-
 /**
  * This function should make a FOUND_NODE message and send it across the wire.
  * Here, we are acting as Bob.  We have collected responses from various Craigs
@@ -1361,26 +1353,15 @@ KademliaRemoteNodeBob.prototype.sendFoundNode = function (aliceKey, searchKey, s
 
   // We can stop listening for answers from these peers.
 
-  // We know who Alice will be sending ICE Candidates to, so we can set up a listener for it.
+  // We know who Alice will be sending ICE Candidates to, but we do not need to
+  // set up a listener or a timeout.  Bob will always forward ICE Candidates
+  // between known peers.
   for (var i=0; i<answers.length; i++) {
     var craigKey = answers[i].key;
-    this.addIceListener(aliceKey, craigKey);
   }
 
   var recipient = this.node.dht.knownPeers[aliceKey];
   recipient.peer.send('dht', msg);
-};
-
-/**
- * Cancel an ICECandidate listener if the channel failed to open after iceTimeout ms.
- */
-KademliaRemoteNodeBob.prototype._cancelIceListener = function (fromKey, toKey) {
-  delete this.node.iceTimeouts[fromKey][toKey];
-  delete this.node.listeners['ICECandidate'][fromKey][toKey];
-  if (Object.keys(this.node.iceTimeouts[fromKey]).length == 0) {
-    delete this.node.iceTimeouts[fromKey];
-    delete this.node.listeners['ICECandidate'][fromKey];
-  }
 };
 
 /**
@@ -1390,6 +1371,8 @@ KademliaRemoteNodeBob.prototype._cancelIceListener = function (fromKey, toKey) {
  * {"op":"ICECandidate", "from":<hex rep of Alice's key>, "to":<hex rep of Craig's key>, "candidate":<whatever the ICE candidate thing is>}
  * If it's from Craig to Alice:
  * {"op":"ICECandidate", "from":<hex rep of Alice's key>, "to":<hex rep of Craig's key>, "idx":<idx>, "candidate":<whatever the ICE candidate thing is>}
+ * Note:  We know that the recipient is a known peer because the onMessage
+ * handler checked for us.  We do not need to repeat this check.
  */
 KademliaRemoteNodeBob.prototype.forwardIceCandidate = function (fromKey, toKey, candidate, serial, idx) {
   // Replace the fromKey with the known fromKey, so we know that nobody is
@@ -1408,6 +1391,7 @@ KademliaRemoteNodeBob.prototype.forwardIceCandidate = function (fromKey, toKey, 
   }
 
   var recipient = this.node.dht.knownPeers[toKey];
+
   recipient.peer.send('dht', msg);
 };
 
