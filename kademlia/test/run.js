@@ -2962,7 +2962,7 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.deepEqual(Object.keys(alice.buckets[30]), [craigKey]);
     });
 
-    it("should set up the onClose handler to remove Craig when Craig closes the connection", function () {
+    it("can't clear listeners when Craig knows the connection because it does not know", function () {
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
@@ -3014,9 +3014,9 @@ describe("KademliaRemoteNodeAlice", function () {
 
       kademlia.mockTime.advance(1);
 
-      assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey].sort());
+      assert.deepEqual(Object.keys(alice.knownPeers).sort(), [bobKey, craigKey].sort());
       assert.deepEqual(Object.keys(alice.buckets[28]).sort(), [bobKey].sort());
-      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [].sort());
+      assert.deepEqual(Object.keys(alice.buckets[30]).sort(), [craigKey].sort());
     });
 
     it("should set up the onClose handler to remove Craig when Alice closes the connection", function () {
@@ -3129,7 +3129,7 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.deepEqual(chansClosed, chansShouldClosed);
     });
 
-    it("sets up the app-requested global onClose handler to work if Craig closes the connection", function () {
+    it("can't call the app-requested global onClose handler to work if Craig closes the connection, because Alice does not know", function () {
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
@@ -3172,8 +3172,6 @@ describe("KademliaRemoteNodeAlice", function () {
       assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
 
       var chansShouldClosed = {};
-      chansShouldClosed[aliceKey] = {};
-      chansShouldClosed[aliceKey][craigKey] = true;
 
       craig.knownPeers[aliceKey].close();
 
@@ -3590,7 +3588,7 @@ describe("KademliaRemoteNodeCraig", function () {
       assert.deepEqual(chansOpened, chansShouldOpened);
     });
 
-    it("sets up the app-requested global onClose handler to work if Alice closes the connection", function () {
+    it("can't call the app-requested global onClose handler to work if Alice closes the connection, because Craig doesn't know", function () {
       var kademlia = mockTimedKademlia();
 
       var aliceKey = '00000000';
@@ -3633,8 +3631,6 @@ describe("KademliaRemoteNodeCraig", function () {
       assert.equal(responseCraigs[Object.keys(responseCraigs)[0]].id, craigKey);
 
       var chansShouldClosed = {};
-      chansShouldClosed[craigKey] = {};
-      chansShouldClosed[craigKey][aliceKey] = true;
 
       alice.knownPeers[craigKey].close();
 

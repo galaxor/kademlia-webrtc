@@ -185,12 +185,9 @@ wrtc.RTCDataChannel.prototype.close = function () {
         chan.closeHandlersCalled = true;
         chan.onclose();
       }
-      if (typeof chan.peer.remoteEnd.dataChannels[this.label].onclose == "function"
-          && !chan.peer.remoteEnd.dataChannels[this.label].closeHandlersCalled)
-      {
-        chan.peer.remoteEnd.dataChannels[this.label].closeHandlersCalled = true;
-        chan.peer.remoteEnd.dataChannels[this.label].onclose();
-      }
+
+      // In real WebRTC, the remote end won't know that the local end closed
+      // the connection, because we're using UDP.
     }, 0);
   }
 };

@@ -1,12 +1,17 @@
 function chanOpen(peer, channel) {
   console.log("Created AND OPENED channel", channel.label);
   $('#connection-establishment').remove();
-  $('#msgs').append("<div id=\"input\"><input type=\"text\" id=\"msg\"></input><button id=\"send\">Send</button>");
+  $('#msgs').append("<div id=\"input\"><input type=\"text\" id=\"msg\"></input><button id=\"send\">Send</button><button id=\"close\">Close</button>");
   $('#msgs #send').click(function () {
     var msg = $('#msgs #msg').val();
     peer.send(channel.label, msg);
     $('#msgs #msg').val('');
     console.log("Sent on ", channel.label, ":", msg);
+  });
+
+  $('#msgs #close').click(function () {
+    console.log("clicked close button");
+    peer.close();
   });
 }
 
@@ -45,6 +50,9 @@ $(document).ready(function () {
         onMessage: function (peer, channel, msg) {
           console.log("Msg on ", channel.label, ": ", msg);
         },
+        onClose: function (peer, channel) {
+          console.log("Channel ", channel.label, " closed.");
+        },
       },
     });
   });
@@ -55,6 +63,9 @@ $(document).ready(function () {
         onOpen: chanOpen,
         onMessage: function (peer, channel, msg) {
           console.log("Msg on ", channel.label, ": ", msg);
+        },
+        onClose: function (peer, channel) {
+          console.log("Channel ", channel.label, " closed.");
         },
       },
     });
