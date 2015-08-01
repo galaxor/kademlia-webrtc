@@ -815,11 +815,7 @@ KademliaRemoteNodeAlice.prototype.receivePeers = function (callback, responsePee
     var node = responsePeers[key];
 
     // Add the newcomers to the buckets.
-    // XXX What if the bucket is full?  Are we sure we want to keep this node and
-    // not another one?  If we were gonna not accept this node, perhaps we
-    // shoulda informed Craig before we promised to talk to them.  For now, we
-    // will punt this decision to the normal _insertNode mechanisms, which will
-    // call _chooseNodeToPrune.
+    // If the bucket is full, the least-recently-seen node will be evicted.
     this.node.dht._insertNode(node, true);
 
     // Set the onClose handler.
@@ -1566,12 +1562,21 @@ KademliaRemoteNodeCraig.prototype.onDataChannelOpen = function (aliceKey, peer, 
   // Cancel ICECandidate listener and timeout.
   this._cancelIceListener(aliceKey, true);
 
+  // Is this a known peer?  If so, what must have happened is that Alice lost
+  // or closed the connection to us (Craig), and is now attempting to re-open
+  // it.  Note that Alice doesn't have to watch for Craig to re-open a
+  // connection, because anybody attempting to open connections is, by
+  // definition, Alice.
+  // Anyway, if it's a known peer, let's get rid of the old, stale one so we
+  // can put in the shiny new one.  (Note that calling removeNode will end up
+  // calling close() on the old node, so its onClose handlers will fire).
+  if (typeof this.node.dht.knownPeers[aliceKey] != "undefined") {
+    this.node.dht.knownPeers[aliceKey].close();
+    this.node.dht._removeNode(aliceKey);
+  }
+
   // Add the newcomer to the buckets.
-  // XXX What if the bucket is full?  Are we sure we want to keep this node and
-  // not another one?  If we were gonna not accept this node, perhaps we
-  // shoulda informed Alice before we promised to talk to them.  For now, we
-  // will punt this decision to the normal _insertNode mechanisms, which will
-  // call _chooseNodeToPrune.
+  // If the bucket is full, the least-recently-seen node will be evicted.
   this.node.dht._insertNode(alice, true);
 
   // Set the onClose handler.
