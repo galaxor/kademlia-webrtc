@@ -1,0 +1,52 @@
+1. Even after a channel is open, more ICE candidates might come in that establish a better way to communicate.  We should establish a way to send these through the open DataChannel.
+
+Here's how it should go, when you get an ICE candidate:
+
+if (it is for me) {
+  if (it is from someone I know) {
+    accept it
+  } else {
+    if (it has searchSerial and stuff) {
+      accept it through the Alice mechanism
+    } else {
+      accept it through the Craig mechanism.
+    }
+  }
+} else {
+  if (it is for someone I know) {
+    forward it
+  } else {
+    Unexpected
+  }
+}
+
+When a channel opens!
+
+if (they are already in knownPeers because of a different search) {
+  NEVER MIND!
+} else {
+  1. Add the peer to knownPeers.
+
+  2. Resolve any searches the remote node is involved in in which we are Craig.
+     That is, let's say that the remote node is now called alice1.
+    Get the list of bobs from whoToldUsAboutAlice.
+    For each of the bobs in that list:
+      Remove whoDidBobTellUsAbout[bobN][alice1]
+    Remove whoToldUsAboutAlice[alice1]
+
+  3. Resolve any searches the remote node is involved in in which we are Alice.
+    Do the pendingResponsePeers thing that's in there already.
+}
+
+Some scenarios:
+
+NodeX is Alice in one search, Craig in another (through different Bobs??):
+  - The alice channel opens first
+  - The craig channel opens first
+
+NodeX is Alice in two searches (I already test this as searchResolution thingy)
+
+NodeX is Craig in two searches (through different Bobs??)
+
+
+2. THEN implement iterativeFindNode, etc.
