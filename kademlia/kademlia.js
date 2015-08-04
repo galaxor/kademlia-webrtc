@@ -737,7 +737,7 @@ KademliaRemoteNodeAlice.prototype._makeOffers = function (callback) {
         },
       },
     });
-    unsortedPeers.push();
+    unsortedPeers.push(peer);
     peer.createOffer();
   }
 };
