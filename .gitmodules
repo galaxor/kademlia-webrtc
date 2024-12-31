@@ -6,4 +6,4 @@
 	url = git@git.iheartryan.com:WebRTCPeer
 [submodule "node_modules/time-mock"]
 	path = node_modules/time-mock
-	url = git://github.com/Colingo/time-mock.git
+	url = https://github.com/Colingo/time-mock.git
